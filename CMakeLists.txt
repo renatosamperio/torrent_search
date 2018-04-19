@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   torrentQuery.msg
+  torrentInvoice.msg
 )
   
 # Generate added messages and services with any dependencies listed here
