@@ -682,7 +682,7 @@ class LimeTorrentsCrawler(Config):
                     
                     ## Checking if month exists
                     if not month_exists:
-                        rospy.logdebug("           Adding month [%s] to [%s]"%(month, key))
+                        rospy.logdebug("T2:           Adding month [%s] to [%s]"%(month, key))
                         db_post[key]['value'].update({month : {}})
                         
                     ## Checking if day exists
@@ -706,20 +706,20 @@ class LimeTorrentsCrawler(Config):
                         #print "=== [",datetime_now.month, "/", datetime_now.day,"], todays_db >= todays_website:", todays_db, '>=', todays_website
                         isTodayWorse    = todays_db >= todays_website
                         if isTodayWorse:
-                            rospy.logdebug("           Existing value for [%s] similar or better", key)
+                            rospy.logdebug("T2:           Existing value for [%s] similar or better", key)
                         
                         # Updating condition and substitute values
                         elif isTodayBetter:
                             ## result = True
                             result      = self.db_handler.Update(condition, subs_item_id)
-                            rospy.logdebug("           Updated [%s] series item with hash [%s] in collection [%s]"% 
+                            rospy.logdebug("T2:           Updated [%s] series item with hash [%s] in collection [%s]"% 
                                       (key, web_element[item_index], self.db_handler.coll_name))
                         
                     ## if day is missing, add it!
                     else:
                         ## result = True
                         result          = self.db_handler.Update(condition, subs_item_id)
-                        rospy.logdebug("           Added [%s] series item for [%s/%s] with hash [%s] in collection [%s]"% 
+                        rospy.logdebug("T2:           Added [%s] series item for [%s/%s] with hash [%s] in collection [%s]"% 
                                   (key, str(datetime_now.month), str(datetime_now.day), web_element[item_index], self.db_handler.coll_name))
                         
         except Exception as inst:
@@ -734,7 +734,7 @@ class LimeTorrentsCrawler(Config):
         result                  = True
         try: 
             if isinstance(db_post,type(None)):
-                rospy.logdebug("Invalid input DB post for printing")
+                rospy.logdebug("T2: Invalid input DB post for printing")
 
             elementKeys         = web_element.keys()
             postKeys            = db_post.keys()
@@ -745,11 +745,11 @@ class LimeTorrentsCrawler(Config):
            
             for key in extra_in_db:
                 if key != '_id':
-                    rospy.logdebug('  -     TODO: Remove item [%s] from DB', key)
+                    rospy.logdebug('T2:  -     TODO: Remove item [%s] from DB', key)
             
             if len(missed_in_db) > 0:
                 for key in missed_in_db:
-                    rospy.logdebug('  -     Updated item [%s] from DB', key)
+                    rospy.logdebug('T2: -     Updated item [%s] from DB', key)
 #                     print "===>_id: ", db_post["_id"]
 #                     print "===>key:", key 
 #                     print "===>web_element:", web_element[key] 
@@ -757,7 +757,7 @@ class LimeTorrentsCrawler(Config):
                                     condition={"_id": db_post["_id"]}, 
                                     substitute={key: web_element[key]}, 
                                     upsertValue=False)
-                    rospy.logdebug("  -       Updated key [%s] in item [%s] of collection [%s]"% 
+                    rospy.logdebug("T2:  -       Updated key [%s] in item [%s] of collection [%s]"% 
                                   (key, db_post["_id"], self.db_handler.coll_name))
         except Exception as inst:
             ros_node.ParseException(inst)
@@ -771,7 +771,6 @@ class LimeTorrentsCrawler(Config):
         '''
         result = False
         try:
-            rospy.logdebug("")
             ## Check if given item already exists, otherwise
             ## insert new time series model for each item ID
             keyItem                 = item[item_index]
@@ -798,7 +797,7 @@ class LimeTorrentsCrawler(Config):
                     item[key_item]   = get_day_timeseries_model(item[key_item], datetime_now)
                 ## Inserting time series model
                 post_id             = self.db_handler.Insert(item)
-                rospy.logdebug("  -     Inserted time series item with hash [%s] in collection [%s]"% 
+                rospy.logdebug("T2:  -     Inserted time series item with hash [%s] in collection [%s]"% 
                                   (keyItem, self.db_handler.coll_name))
                 result = post_id is not None
             else:
@@ -809,9 +808,9 @@ class LimeTorrentsCrawler(Config):
                     ## 1) Check if there are missing or extra keys
                     updated_missing = self.AddMissingKeys(copy.deepcopy(post), item)
                     if updated_missing:
-                        rospy.logdebug('    2.4.1) Added item  [%s] into DB ', keyItem)
+                        rospy.logdebug('T2:    2.4.1) Added item  [%s] into DB ', keyItem)
                     else:
-                        rospy.logdebug('    2.4.2) DB Updated failed or no added key in item [%s]', keyItem)
+                        rospy.logdebug('T2:    2.4.2) DB Updated failed or no added key in item [%s]', keyItem)
                     
                     ## 2) Check if items for HASH already exists
                     ts_updated      = self.UpdateBestSeriesValue(post, 
@@ -819,9 +818,9 @@ class LimeTorrentsCrawler(Config):
                                                                  item_index, 
                                                                  items_id)
                     if ts_updated:
-                        rospy.logdebug('    2.4.3) Time series updated for [%s]', keyItem)
+                        rospy.logdebug('T2:    2.4.3) Time series updated for [%s]', keyItem)
                     else:
-                        rospy.logdebug('    2.4.4) DB Updated failed or time series not updated for [%s]', keyItem)
+                        rospy.logdebug('T2:    2.4.4) DB Updated failed or time series not updated for [%s]', keyItem)
                     result              = updated_missing and ts_updated
                     
         except Exception as inst:
