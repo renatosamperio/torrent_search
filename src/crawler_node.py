@@ -48,8 +48,6 @@ class CrawlerNode(ros_node.RosNode):
                     self.page_limit = value
                 elif "search_type" == key:
                     self.search_type = value
-                elif "page_limit" == key:
-                    self.page_limit = value
                 elif "with_magnet" == key:
                     self.with_magnet = value
                 elif "with_db" == key:
@@ -63,11 +61,14 @@ class CrawlerNode(ros_node.RosNode):
     def SubscribeCallback(self, msg, topic):
         try:
             if 'search_for_torrent' in topic:
+                print msg
                 ## Get incoming message
                 #with self.threats_lock:
                 self.title      = msg.title
                 self.database   = msg.database
                 self.collection = msg.collection
+                self.page_limit = msg.page_limit
+                self.search_type= msg.search_type
     
                 ## Notify thread that data has arrived
                 with self.condition:
@@ -120,7 +121,7 @@ class CrawlerNode(ros_node.RosNode):
                     'collection':   self.collection,
                     })
                 lmt = LimeTorrentsCrawler(**args)
-                lmt.Run()
+                lmt.run()
         except Exception as inst:
               ros_node.ParseException(inst)
               
