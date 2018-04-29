@@ -190,10 +190,10 @@ if __name__ == '__main__':
         
     ## Defining static variables for subscribers and publishers
     sub_topics     = [
-        ('~search_for_torrent',  torrentQuery)
+        ('~search_for_torrent', torrentQuery)
     ]
     pub_topics     = [
-        #('~topic2',  Bool)
+        ('service_result',     torrentInvoice)
     ]
     system_params  = [
         '/torrent_crawler/page_limit',
