@@ -654,6 +654,16 @@ class LimeTorrentsCrawler(Config):
         except Exception as inst:
           ros_node.ParseException(inst)
 
+    def run_complete(self):
+        if self.crawler_finished and self.parser_finished:
+            with self.complete_cond:
+                self.complete_cond.notifyAll()
+        else:
+            crawler_result = 'is finished' if self.crawler_finished else 'has NOT finished'
+            parser_result = 'is finished' if self.crawler_finished else 'has NOT finished'
+            rospy.logdebug('Not started DB completion because, crawler %s and parser %s'%
+                           (crawler_result, parser_result))
+
     def UpdateBestSeriesValue(self, db_post, web_element, item_index, items_id):
         '''
         Comparator for time series update to check if for today already exists a value. 
