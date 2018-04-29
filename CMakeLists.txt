@@ -7,14 +7,27 @@ project(torrent_search)
 find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
+  message_generation
 )
 
+# Generate messages in the 'msg' folder
+add_message_files(
+  FILES
+  torrentQuery.msg
+)
+  
+# Generate added messages and services with any dependencies listed here
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
+ 
 ###################################
 ## catkin specific configuration ##
 ###################################
 catkin_package(
   LIBRARIES ${PROJECT_NAME} 
-  CATKIN_DEPENDS rospy std_msgs
+  CATKIN_DEPENDS message_runtime rospy std_msgs
 )
 
 ###########
