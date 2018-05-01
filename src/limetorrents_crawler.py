@@ -606,7 +606,7 @@ class LimeTorrentsCrawler(Config):
         except Exception as inst:
           ros_node.ParseException(inst)
 
-    def run(self):
+    def Init(self):
         try:
             
             rospy.logdebug("Obtaining proxies...")
@@ -616,12 +616,8 @@ class LimeTorrentsCrawler(Config):
             else:
                 rospy.logdebug("Proxy failed")
                 return
-                
+
             ## Generating one shot threads
-            rospy.logdebug("Generating one shot threads")
-            rospy.Timer(rospy.Duration(0.5), self.get_html,   oneshot=True)
-            rospy.Timer(rospy.Duration(0.5), self.parse_html, oneshot=True)
-            rospy.Timer(rospy.Duration(0.5), self.complete_db, oneshot=True)
         except Exception as inst:
           ros_node.ParseException(inst)
         
