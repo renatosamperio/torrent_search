@@ -38,6 +38,7 @@ class LimeTorrentsCrawler(Config):
         """Initialisations."""
         try:
             self.condition  = threading.Condition()
+            self.complete_cond  = threading.Condition()
             Config.__init__(self)
             ## Initialising class variables
             self.class_name = self.__class__.__name__.lower()
@@ -91,12 +92,13 @@ class LimeTorrentsCrawler(Config):
             
             self.lock       = threading.Lock()
             self.crawler_finished = False
+            self.parser_finished = False
             
             
             if self.with_db:
                 rospy.logdebug("  + Generating database [%s] in [%s] collections"% 
                                   (self.database, self.collection))
-                self.db_handler = MongoAccess(debug=True)
+                self.db_handler = MongoAccess(debug=False)
                 self.db_handler.connect(self.database, self.collection)
                 
         except Exception as inst:
@@ -363,6 +365,9 @@ class LimeTorrentsCrawler(Config):
                               (page_counter, pages_queue.qsize(), self.missed.qsize()))
             self.crawler_finished = True
             
+            ## Call complete DB process
+            rospy.logdebug('T1: Calling DB completion')
+            self.run_complete()
         except Exception as inst:
             self.thread1_running = False
             ros_node.ParseException(inst)
@@ -376,6 +381,7 @@ class LimeTorrentsCrawler(Config):
         with torrent name, link and magnetic link
         """
         try:
+            self.parser_finished = False
             pages_parsed = 0
             while not self.crawler_finished:
                 ## Waiting to be notified by other thread
@@ -493,9 +499,13 @@ class LimeTorrentsCrawler(Config):
                     rospy.logdebug("T2:  - Total parsed pages: [%d]"%pages_parsed)
                     
                 rospy.logdebug("T2:  2.5) Finished parsing HTML")
+            
+            self.parser_finished = True
+            rospy.logdebug('T2: Found [%d] items'%pages_parsed)
 
-            rospy.logdebug('T2:Found [%d] items'%pages_parsed)
-
+            ## Call complete DB process
+            rospy.logdebug('T2: Calling DB completion')
+            self.run_complete()
         except Exception as inst:
           self.thread2_running = False
           ros_node.ParseException(inst)
@@ -504,7 +514,10 @@ class LimeTorrentsCrawler(Config):
         '''
         '''
         try:
-            with self.condition:
+            with self.complete_cond:
+                rospy.logdebug("T3:  3.1) Waiting for HTML crawler notification...")
+                self.complete_cond.wait()
+                
                 items           = ['leeches', 'seeds']
                 datetime_now    = datetime.datetime.utcnow()
                 
@@ -601,6 +614,7 @@ class LimeTorrentsCrawler(Config):
             rospy.logdebug("Generating one shot threads")
             rospy.Timer(rospy.Duration(0.5), self.get_html,   oneshot=True)
             rospy.Timer(rospy.Duration(0.5), self.parse_html, oneshot=True)
+            rospy.Timer(rospy.Duration(0.5), self.complete_db, oneshot=True)
         except Exception as inst:
           ros_node.ParseException(inst)
         
