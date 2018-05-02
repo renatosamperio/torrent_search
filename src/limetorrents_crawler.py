@@ -520,91 +520,88 @@ class LimeTorrentsCrawler(Config):
         '''
         '''
         try:
-            with self.complete_cond:
-                rospy.loginfo("T3:  3.1) Waiting for HTML crawler notification...")
-                self.complete_cond.wait()
-                
-                items           = ['leeches', 'seeds']
-                datetime_now    = datetime.datetime.utcnow()
-                
-                month           = str(datetime_now.month)
-                day             = str(datetime_now.day)
-                page_counter    = 0
-                total_fetch_time= 0.0
-                    
-                rospy.logdebug('T3:    3.1) Searching non updated items')
-                leeches_key     = 'leeches.value.'+month+"."+day
-                seeds_key       = 'seeds.value.'+month+"."+day
-                condition       = { '$or': [{ leeches_key : {'$exists': False}}, { seeds_key : {'$exists': False}}]}
-                posts           = self.db_handler.Find(condition)
-                postsSize       = posts.count()
-                rospy.logdebug('T3:         Found [%d] items'%postsSize)
-                
-                rospy.logdebug('T3:    3.2) Creating queue of posts')
-                posts_queue     = Queue.Queue()
-                for post in posts:
-                    posts_queue.put(post)
-                
-                while not posts_queue.empty():
-                    post = posts_queue.get()
-                    ##pprint.pprint(post)
-                    search_url  = post['link'].encode("utf-8")
-#                     print "===> search_url:", search_url
-                    rospy.logdebug("T3:      3.2.1) Looking into URL")
-                    
-                    self.soup, time_, returned_code = self.http_request_timed(search_url)
+            items           = ['leeches', 'seeds']
+            datetime_now    = datetime.datetime.utcnow()
             
-                    if str(type(self.soup)) == 'bs4.BeautifulSoup':
-                        rospy.logwarn("T3: Invalid HTML search type [%s]"%str(type(self.soup)))
-                        waiting_time = 30 
-                        rospy.loginfo("T3:       Waiting for [%d]s:"%waiting_time)
-                        time.sleep(waiting_time)
-                        posts_queue.put(post)
-                        continue
+            month           = str(datetime_now.month)
+            day             = str(datetime_now.day)
+            page_counter    = 0
+            total_fetch_time= 0.0
+                
+            rospy.logdebug('T3:    3.1) Searching non updated items')
+            leeches_key     = 'leeches.value.'+month+"."+day
+            seeds_key       = 'seeds.value.'+month+"."+day
+            condition       = { '$or': [{ leeches_key : {'$exists': False}}, { seeds_key : {'$exists': False}}]}
+            posts           = self.db_handler.Find(condition)
+            postsSize       = posts.count()
+            rospy.logdebug('T3:         Found [%d] items'%postsSize)
+            
+            return
+            rospy.logdebug('T3:    3.2) Creating queue of posts')
+            posts_queue     = Queue.Queue()
+            for post in posts:
+                posts_queue.put(post)
+            
+            while not posts_queue.empty():
+                post = posts_queue.get()
+                ##pprint.pprint(post)
+                search_url  = post['link'].encode("utf-8")
+#                     print "===> search_url:", search_url
+                rospy.logdebug("T3:      3.2.1) Looking into URL")
+                
+                soup, time_, returned_code = self.http_request_timed(search_url)
+        
+                if str(type(soup)) == 'bs4.BeautifulSoup':
+                    rospy.logwarn("T3: Invalid HTML search type [%s]"%str(type(soup)))
+                    waiting_time = 30 
+                    rospy.loginfo("T3:       Waiting for [%d]s:"%waiting_time)
+                    time.sleep(waiting_time)
+                    posts_queue.put(post)
+                    continue
+                
+                if returned_code != 200:
+                    rospy.logwarn("T3: Returned code [%s] captured page [%s]"% (str(returned_code), search_url))
+                    self.missed.put(search_url)
+                    waiting_time = 30 
+                    rospy.loginfo("T3:       Waiting for [%d]s:"%waiting_time)
+                    time.sleep(waiting_time)
+                    posts_queue.put(post)
+                    continue
                     
-                    if returned_code != 200:
-                        rospy.logwarn("T3: Returned code [%s] captured page [%s]"% (str(returned_code), search_url))
-                        self.missed.put(search_url)
-                        waiting_time = 30 
-                        rospy.loginfo("T3:       Waiting for [%d]s:"%waiting_time)
-                        time.sleep(waiting_time)
-                        posts_queue.put(post)
-                        continue
-                        
-                    if self.soup is None:
-                        rospy.logwarn("T3: Invalid page retrieved")
-                        continue
+                if soup is None:
+                    rospy.logwarn("T3: Invalid page retrieved")
+                    continue
 
-                    page_counter += 1
-                    rospy.loginfo("T3:       Captured page %d/%d in %.2f sec" % (page_counter+1, postsSize, time_))
-                    total_fetch_time += time_
+                page_counter += 1
+                rospy.loginfo("T3:       Captured page %d/%d in %.2f sec" % (page_counter+1, postsSize, time_))
+                total_fetch_time += time_
+                
+                ## Looking for table components
+                rospy.logdebug("T3:      3.2.2) Searching for leechers, seeders and hash ID")
+                search_table    = soup.find('table')
+                lines           = search_table.findAll('td')
+                hash            = lines[2].string.strip()
+                
+                seeders_num     = None
+                seeders_data    = soup.body.findAll(text=re.compile('^Seeders'))
+                if len(seeders_data)>1:
+                    seeders_num = seeders_data[0].split(':')[1].strip()
                     
-                    ## Looking for table components
-                    rospy.logdebug("T3:      3.2.2) Searching for leechers, seeders and hash ID")
-                    search_table    = self.soup.find('table')
-                    lines           = search_table.findAll('td')
-                    hash            = lines[2].string.strip()
-                    
-                    seeders_num     = None
-                    seeders_data    = self.soup.body.findAll(text=re.compile('^Seeders'))
-                    if len(seeders_data)>1:
-                        seeders_num = seeders_data[0].split(':')[1].strip()
-                        
-                    leechers_num    = None
-                    leechers_data   = self.soup.body.findAll(text=re.compile('^Leechers'))
-                    if len(leechers_data)>1:
-                        leechers_num= leechers_data[0].split(':')[1].strip()
-                    
-                    if post['hash'] == hash:
-                    	rospy.logdebug("T3:      3.2.3) Updating item [%s] with [%s] leeches " % (hash, leechers_num))
-                        condition   = { 'hash' : hash }
-                        leeches_item= {leeches_key: leechers_num }
-                        result      = self.db_handler.Update(condition, leeches_item)
+                leechers_num    = None
+                leechers_data   = soup.body.findAll(text=re.compile('^Leechers'))
+                if len(leechers_data)>1:
+                    leechers_num= leechers_data[0].split(':')[1].strip()
+                
+                if post['hash'] == hash:
+                    rospy.logdebug("T3:      3.2.3) Updating item [%s] with [%s] leeches " % (hash, leechers_num))
+                    condition   = { 'hash' : hash }
+                    leeches_item= {leeches_key: leechers_num }
+                    result      = self.db_handler.Update(condition, leeches_item)
 
-                        rospy.logdebug("T3:      3.2.4) Updating item [%s] with [%s] seeds " % (hash, seeders_num))
-                        condition   = { 'hash' : hash }
-                        seeds_item  = {seeds_key: seeders_num }
-                        result      = self.db_handler.Update(condition, seeds_item)
+                    rospy.logdebug("T3:      3.2.4) Updating item [%s] with [%s] seeds " % (hash, seeders_num))
+                    condition   = { 'hash' : hash }
+                    seeds_item  = {seeds_key: seeders_num }
+                    result      = self.db_handler.Update(condition, seeds_item)
 
         except Exception as inst:
           ros_node.ParseException(inst)
