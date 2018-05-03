@@ -15,7 +15,7 @@ from controller import TorrentsController
 from std_msgs.msg import Bool
 from std_msgs.msg import String
 from torrent_search.msg import torrentQuery
-
+from torrent_search.msg import torrentInvoice
 
 class CrawlerNode(ros_node.RosNode):
     def __init__(self, **kwargs):
@@ -132,9 +132,39 @@ class CrawlerNode(ros_node.RosNode):
                     rate_sleep = rospy.Rate(1.0)
                     rate_sleep.sleep()
                     self.controller.collect_data(**args)
+                    
+                    with self.controller.run_post:
+                        rospy.loginfo('+ Waiting for post executioning actoin')
+                        self.controller.run_post.wait()
+                        
+                        ## Get service invoice
+                        rospy.loginfo('Calling invoice generation')
+                        invoice = self.controller.GetInvoice()
+                        self.PublishInvoice(invoice)
+                    
         except Exception as inst:
               ros_node.ParseException(inst)
-              
+
+    def PublishInvoice(self, invoice):
+        try:
+            if invoice is None:
+                rospy.logwarn('Invalid invoice')
+                return
+                
+            ## Preparing invoice message
+            msg = torrentInvoice()
+            msg.database    = invoice['database']
+            msg.collection  = invoice['collection']
+            msg.service_type= invoice['search_type']
+            msg.node_type   = 'torrent_crawler'
+            msg.result      = json.dumps(invoice['result'], 
+                                         sort_keys=True,
+                                         separators=(',', ': '))
+            msg.header.stamp= rospy.Time.now()
+            self.Publish('service_result', msg)
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
 if __name__ == '__main__':
     usage       = "usage: %prog option1=string option2=bool"
     parser      = OptionParser(usage=usage)
