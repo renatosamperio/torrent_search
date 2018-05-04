@@ -341,7 +341,7 @@ class LimeTorrentsCrawler(Config):
             print "CRAWLER FINISHED!!!"
             self.thread1_running.clear()
 
-    def parse_html(self, cond=None):
+    def parse_html(self):
         """
         Parse HTML to get required results.
 
@@ -350,54 +350,64 @@ class LimeTorrentsCrawler(Config):
         with torrent name, link and magnetic link
         """
         try:
-            self.parser_finished = False
-            pages_parsed = 0
-            while not self.crawler_finished:
-                ## Waiting to be notified by other thread
-                with self.condition:
-                    rospy.logdebug("T2:  2.1) Waiting for HTML crawler notification...")
-                    self.condition.wait()
+            pages_parsed    = 0
+            link_parsed     = 0
+            while pages_parsed < 1 or self.soup_dict.qsize() >0:
+                rospy.logdebug("-"*80)
+                rospy.logdebug("T2:  2.1) Parsing [%s] torrent pages"%(self.soup_dict.qsize()))
+                self.thread2_running.set()
                 
-                state = 'is running' if self.thread1_running else 'has stopped'
-                rospy.logwarn("T2:  Got notified  and GET_HTML %s" % (state))
-                ## Acquiring lock and collecting soup
+                state = 'is running' if self.thread1_running.is_set() else 'has stopped'
+                
+                ## If there is nothing to do, wait for notification
+                if self.soup_dict.empty():
+                    rospy.logdebug("T2:  < A > Got notified but queue is empty")
+                    
+                    ## Waiting to be notified by other thread
+                    with self.condition:
+                        rospy.logdebug("T2:  < B > Waiting for HTML crawler notification...")
+                        self.condition.wait()
+                        rospy.logwarn("T2:  < C > Got notified  and GET_HTML %s" % (state))
+                        #continue
+                
+                ## Acquiring lock for processing queue of retrieved pages
                 with self.lock:
-                    if self.soup_dict.empty():
-                        rospy.logdebug("T2:  - Got notified but queue is empty")
-                        continue
                     soupDict       = self.soup_dict.get()
 
                 ## Getting HTML captured item
                 soupKeys            = soupDict.keys()
                 if len(soupKeys) <0:
-                    self.logger.debug("T2:  - No keys in queue, skiping URL parse")
+                    rospy.logdebug("T2:  - No keys in queue, skiping URL parse")
                     continue
 
                 ## Once soup has been collected, starting to parse
                 page                = soupKeys[0]
                 rospy.logdebug("T2:  2.2) Getting page [%d]"%(page+1))
-                self.soup           = soupDict[page]
+                soup                = soupDict[page]
                 
                 ## Verifying soup is valid
-                if not isinstance(self.soup, bs4.BeautifulSoup):
+                if not isinstance(soup, bs4.BeautifulSoup):
                     rospy.logerr("T2:Invalid HTML search item")
                     
                 ## Looking for table components
-                content             = self.soup.find('table', class_='table2')
-                rospy.logdebug("T2:  2.3) Looking for data in page [%d]"%(page+1))
-                
+                content             = soup.find('table', class_='table2')
+                rospy.logdebug("T2:  2.3) Looking for torrent data in page [%d]"%(page+1))
                 if content is None:
                     rospy.logerr("T2:Invalid parsed content")
                     return
+                
                 results             = content.findAll('tr')
                 for result in results[1:]:
+                    ## Increasing links processed counter
+                    link_parsed =+ 1
+                    
                     data            = result.findAll('td')
                     # try block is limetorrents-specific. Means only limetorrents requires this.
                     tag_found       = data[0].findAll('a')
-                    print "===> tag_found.len:", len(tag_found)
-                    name            = tag_found[1].string
-                    link            = tag_found[1]['href']
-                    link            = self.proxy+link
+                    link_index      = len(tag_found)-1
+                    name            = tag_found[link_index].string
+                    link            = tag_found[link_index]['href']
+                    link            = (self.proxy+link).encode('ascii', 'ignore').decode('ascii')
                     date            = data[1].string
                     date            = date.split('-')[0]
                     size            = data[2].string
