@@ -453,40 +453,46 @@ class LimeTorrentsCrawler(Config):
 
                     ## Getting magnet link
                     if self.with_magnet:
-                        rospy.logdebug("T2:      Getting magnet link")
+                        rospy.logdebug("T2:  2.3.1) Getting magnet link")
                         magnetic_link = self.get_magnet_ext(link)
                         if magnetic_link is None:
-                            rospy.logwarn('T2:No available magnet for: %s'%str(link))
+                            rospy.logwarn('T2:  No available magnet for [%s] with link [%s]'%
+                                          (hash, str(link)))
+                            
+                            ## Adding element to missing links list
+                            self.missed_links.put(element)
+                            rospy.logwarn('T2:  2.3.2) Added [%s] to missing links, size [%s]'%
+                                          (hash, str(self.missed_links.qsize())))
+                            waiting_time = 30 
+                            rospy.loginfo("T2:  2.3.3) Waiting for [%d]s:"%waiting_time)
+                            time.sleep(waiting_time)
+
                             magnetic_link = ''
                         element.update({'magnetic_link': magnetic_link})
 
                     ## Inserting in database
-                    if self.with_db:
-                        rospy.logdebug("T2:  2.4) Appending in database [%s]"%element['hash'])
+                    if self.db_handler is not None:
+                        rospy.logdebug("T2:  2.4) [%d.%d] Appending in database [%s]"%
+                                       (pages_parsed+1, (link_parsed+1), element['hash']))
                         result = self.Update_TimeSeries_Day(element, 
                                                     'hash',         ## This is the item key, it should be unique!
                                                     ['seeds', 'leeches'],  ## These items are defined in a time series
                                                     ) 
                         if not result:
                             rospy.logerr("T2:DB insertion failed")
-                        
-                    pages_parsed += 1
                     
-                if self.with_db:
+                ## Incremented torrents got magentic link
+                pages_parsed += 1
+
+                rospy.logdebug("T2: Remaining torrent pages [%s]"%(self.soup_dict.qsize()))
+                if self.db_handler is not None:
                     rospy.logdebug("T2:  - Total records in DB: [%d]"%self.db_handler.Size())
                 else:
                     rospy.logdebug("T2:  - Total parsed pages: [%d]"%pages_parsed)
                     
                 rospy.logdebug("T2:  2.5) Finished parsing HTML")
             
-            self.parser_finished = True
-            rospy.logdebug('T2: Found [%d] items'%pages_parsed)
-
-            ## Call complete DB process
-            rospy.logdebug('T2: Calling DB completion')
-            self.run_complete()
         except Exception as inst:
-          self.thread2_running = False
           ros_node.ParseException(inst)
 
     def complete_db(self, cond=None):
