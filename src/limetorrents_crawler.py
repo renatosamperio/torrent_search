@@ -489,11 +489,32 @@ class LimeTorrentsCrawler(Config):
                     rospy.logdebug("T2:  - Total records in DB: [%d]"%self.db_handler.Size())
                 else:
                     rospy.logdebug("T2:  - Total parsed pages: [%d]"%pages_parsed)
-                    
+                
+                ## Retrying missing torrent tiles
+                rospy.logwarn("T2:  + Found [%s] elements with missing link"%self.missed_links.qsize() )
+                while self.missed_links.qsize()>0:
+                    element         = self.missed_links.get()
+                    rospy.logdebug("T2:  + Re-opening element [%s]"%element['hash'])
+                    magnetic_link   = self.get_magnet_ext(link)
+                    if magnetic_link is None:
+                        rospy.logwarn('T2:  + No available magnet for: %s'%str(link))
+                    else:
+                        element.update({'magnetic_link': magnetic_link})
+                        rospy.logdebug("T2:  + Appending in database [%s]"%element['hash'])
+                        result = self.Update_TimeSeries_Day(element, 
+                                        'hash',         ## This is the item key, it should be unique!
+                                        ['seeds', 'leeches'],  ## These items are defined in a time series
+                                        ) 
+                        if not result:
+                            rospy.logerr("T2:  + DB insertion failed")
+                
                 rospy.logdebug("T2:  2.5) Finished parsing HTML")
             
         except Exception as inst:
           ros_node.ParseException(inst)
+        finally:
+            ## Clearing thread flag
+            self.thread2_running.clear()
 
     def complete_db(self, cond=None):
         '''
