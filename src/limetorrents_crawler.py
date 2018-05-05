@@ -262,7 +262,7 @@ class LimeTorrentsCrawler(Config):
         except Exception as inst:
           ros_node.ParseException(inst)
             
-    def get_html(self, cond=None):
+    def get_html(self):
         """
         To get HTML page.
 
@@ -272,35 +272,27 @@ class LimeTorrentsCrawler(Config):
         Uses http_request_time() from Common.py module.
         """
         try:
-            
-            self.crawler_finished = False
-            
             ## Populating queue of pages for HTML capture
             pages_queue = Queue.Queue()
             for page in range(self.pages):
                 pages_queue.put(page)
             page_counter = 0
-            
+
             while not pages_queue.empty():
+                self.thread1_running.set()
                 page = pages_queue.get()
                 
-                state = 'is running' if self.thread2_running else 'has stopped'
+                state = 'is running' if self.thread2_running.is_set() else 'has stopped'
                 rospy.logwarn("T1:  Fetching page: %d/%s and PARSE_HTML %s" % 
                               (page+1, self.pages, state))
                 rospy.logdebug("T1:  1.1) Fetching page: %d/%s" % (page+1, self.pages))
                 
                 search_title = self.get_url(self.search_type)
                 search_title = search_title + '{}/'.format(page+1)
-#                 print "===> self.proxy:", self.proxy
-#                 print "===> search_title:", search_title
                 search_url = self.proxy + search_title
 
                 rospy.logdebug("T1:  1.2) Looking into:"+search_url)
                 self.soup, time_, returned_code = self.http_request_timed(search_url)
-                
-#                 print "===> time:", time
-#                 print "===> returned_code:", returned_code
-#                 print "---> soup:", self.soup == None 
                 
                 if str(type(self.soup)) == 'bs4.BeautifulSoup':
                     rospy.logerr("T1:Invalid HTML search type [%s]"%str(type(self.soup)))
@@ -325,9 +317,9 @@ class LimeTorrentsCrawler(Config):
                 rospy.loginfo("T1:  Captured page %d/%d in %.2f sec" % (page+1, self.pages, time_))
                 self.total_fetch_time += time_
                     
-                #with self.lock:
-                rospy.logdebug("T1:  1.3) Placing page [%d] in queue"%page)
-                self.soup_dict.put({page : self.soup})
+                with self.lock:
+                    rospy.logdebug("T1:  1.3) Placing page [%d] in queue"%page)
+                    self.soup_dict.put({page : self.soup})
                     
                 with self.condition:
                     if returned_code != 200:
@@ -339,14 +331,15 @@ class LimeTorrentsCrawler(Config):
             
             rospy.loginfo("T1:  + Got [%d] pages and finished with [%d] and missing [%d]"%
                               (page_counter, pages_queue.qsize(), self.missed.qsize()))
+
             self.crawler_finished = True
             
-            ## Call complete DB process
-            rospy.logdebug('T1: Calling DB completion')
-            self.run_complete()
         except Exception as inst:
-            self.thread1_running = False
             ros_node.ParseException(inst)
+        finally:
+            ## Clearing thread flag
+            print "CRAWLER FINISHED!!!"
+            self.thread1_running.clear()
 
     def parse_html(self, cond=None):
         """
