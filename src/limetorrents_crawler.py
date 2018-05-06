@@ -211,10 +211,10 @@ class LimeTorrentsCrawler(Config):
         for proxy in self.proxies:
             rospy.logdebug("Trying %s" % (self.colorify("yellow", proxy)))
             rospy.logdebug("Trying proxy: %s" % (proxy))
-            self.soup = self.http_request(proxy)
+            soup = self.http_request(proxy)
             try:
                 ## print "=== What is self.soup?",self.soup
-                if self.soup is not None and self.soup == -1 or 'limetorrents' not in self.soup.find('div', id='logo').a['title'].lower():
+                if soup is not None and soup == -1 or 'limetorrents' not in soup.find('div', id='logo').a['title'].lower():
                     rospy.logdebug("Bad proxy!")
                     count += 1
                     if count == len(self.proxies):
@@ -226,8 +226,8 @@ class LimeTorrentsCrawler(Config):
                     rospy.logdebug("Proxy available. Performing test...")
                     url = proxy+"/search/all/hello/seeds/1/"
                     rospy.logdebug("Carrying out test for string 'hello'")
-                    self.soup = self.http_request(url)
-                    test = self.soup.find('table', class_='table2')
+                    soup = self.http_request(url)
+                    test = soup.find('table', class_='table2')
                     if test is not None:
                         self.proxy = proxy
                         rospy.logdebug("Pass!")
