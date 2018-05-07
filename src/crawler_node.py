@@ -112,13 +112,11 @@ class CrawlerNode(ros_node.RosNode):
             
             while not rospy.is_shutdown():
                 with self.condition:
-                    rospy.logdebug('+ Waiting for incoming data')
+                    rospy.logdebug('+ Waiting for next crawling command')
                     self.condition.wait()
-
-                ## Initialising lime torrents crawler
-                rospy.loginfo('  Setting lime torrents crawler')
-                args = {}
-                args.update({
+                
+                ## Collecting connection data
+                args = {
                     'title':        self.title,
                     'page_limit':   self.page_limit,
                     'search_type':  self.search_type,
@@ -126,9 +124,14 @@ class CrawlerNode(ros_node.RosNode):
                     'with_db':      self.with_db,
                     'database':     self.database,
                     'collection':   self.collection,
-                    })
-                lmt = LimeTorrentsCrawler(**args)
-                lmt.run()
+                    }
+
+                if self.search_type == 'complete_db':
+                    print "===> DO A COMPLETE DB ONLY"
+                else:
+                    rate_sleep = rospy.Rate(1.0)
+                    rate_sleep.sleep()
+                    self.lmt.collect_data(**args)
         except Exception as inst:
               ros_node.ParseException(inst)
               
