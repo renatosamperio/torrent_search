@@ -10,7 +10,8 @@ import json
 
 from optparse import OptionParser, OptionGroup
 from hs_utils import ros_node
-from limetorrents_crawler import LimeTorrentsCrawler
+#from limetorrents_crawler import LimeTorrentsCrawler
+from controller import TorrentsController
 
 from std_msgs.msg import Bool
 from std_msgs.msg import String
@@ -41,6 +42,7 @@ class CrawlerNode(ros_node.RosNode):
             self.title             = None
             self.database          = None
             self.collection        = None
+            self.lmt               = None 
             
             ## Parsing arguments
             for key, value in kwargs.iteritems():
@@ -91,6 +93,12 @@ class CrawlerNode(ros_node.RosNode):
             ## Starting publisher thread
             rospy.loginfo('Starting lime torrents crawler service')
             rospy.Timer(rospy.Duration(0.5), self.Run, oneshot=True)
+            
+            ## Initialising lime torrents crawler
+            if self.lmt is None:
+                rospy.loginfo('Creating Lime torrent crawler')
+                args = {}
+                self.lmt    = TorrentsController(**args)
         except Exception as inst:
               ros_node.ParseException(inst)
  
