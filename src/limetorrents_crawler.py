@@ -329,7 +329,7 @@ class LimeTorrentsCrawler(Config):
                 if str(type(self.soup)) == 'bs4.BeautifulSoup':
                     rospy.logerr("T1:Invalid HTML search type [%s]"%str(type(self.soup)))
                     waiting_time = 30 
-                    rospy.logdebug("T1:       Waiting for [%d]s:"%waiting_time)
+                    rospy.loginfo("T1:       Waiting for [%d]s:"%waiting_time)
                     time.sleep(waiting_time)
                     pages_queue.put(page)
                     continue
@@ -338,7 +338,7 @@ class LimeTorrentsCrawler(Config):
                     rospy.logwarn("T1:Returned code [%s] captured page [%s]"% (str(returned_code), search_url))
                     self.missed.put(search_url)
                     waiting_time = 30
-                    rospy.logdebug("T1:       Waiting for [%d]s:"%waiting_time)
+                    rospy.loginfo("T1:       Waiting for [%d]s:"%waiting_time)
                     with self.condition:
                         rospy.logdebug("T1:       Notifying html parsing with error code [%s]"%str(returned_code))
                         self.condition.notifyAll()
@@ -515,7 +515,7 @@ class LimeTorrentsCrawler(Config):
         '''
         try:
             with self.complete_cond:
-                rospy.logdebug("T3:  3.1) Waiting for HTML crawler notification...")
+                rospy.loginfo("T3:  3.1) Waiting for HTML crawler notification...")
                 self.complete_cond.wait()
                 
                 items           = ['leeches', 'seeds']
@@ -551,7 +551,7 @@ class LimeTorrentsCrawler(Config):
                     if str(type(self.soup)) == 'bs4.BeautifulSoup':
                         rospy.logwarn("T3: Invalid HTML search type [%s]"%str(type(self.soup)))
                         waiting_time = 30 
-                        rospy.logdebug("T3:       Waiting for [%d]s:"%waiting_time)
+                        rospy.loginfo("T3:       Waiting for [%d]s:"%waiting_time)
                         time.sleep(waiting_time)
                         posts_queue.put(post)
                         continue
@@ -560,13 +560,13 @@ class LimeTorrentsCrawler(Config):
                         rospy.logwarn("T3: Returned code [%s] captured page [%s]"% (str(returned_code), search_url))
                         self.missed.put(search_url)
                         waiting_time = 30 
-                        rospy.logdebug("T3:       Waiting for [%d]s:"%waiting_time)
+                        rospy.loginfo("T3:       Waiting for [%d]s:"%waiting_time)
                         time.sleep(waiting_time)
                         posts_queue.put(post)
                         continue
                         
                     page_counter += 1
-                    rospy.logdebug("T3:       Captured page %d/%d in %.2f sec" % (page_counter+1, postsSize, time_))
+                    rospy.loginfo("T3:       Captured page %d/%d in %.2f sec" % (page_counter+1, postsSize, time_))
                     total_fetch_time += time_
                     
                     ## Looking for table components

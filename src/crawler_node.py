@@ -61,7 +61,6 @@ class CrawlerNode(ros_node.RosNode):
     def SubscribeCallback(self, msg, topic):
         try:
             if 'search_for_torrent' in topic:
-                print msg
                 ## Get incoming message
                 #with self.threats_lock:
                 self.title      = msg.title
