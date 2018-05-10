@@ -565,6 +565,10 @@ class LimeTorrentsCrawler(Config):
                         posts_queue.put(post)
                         continue
                         
+                    if self.soup is None:
+                        rospy.logwarn("T3: Invalid page retrieved")
+                        continue
+
                     page_counter += 1
                     rospy.loginfo("T3:       Captured page %d/%d in %.2f sec" % (page_counter+1, postsSize, time_))
                     total_fetch_time += time_
