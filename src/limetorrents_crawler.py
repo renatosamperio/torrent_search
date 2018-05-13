@@ -165,22 +165,23 @@ class LimeTorrentsCrawler(Config):
         """
         try:
             magnet = None
-            rospy.logdebug("Fetching magnetic link with [%s]"%self.class_name)
-            soup = self.http_request(link)
-            if soup is None:
-                rospy.logwarn('HTTP Request failed for: %s'%str(link))
-                return magnet
-            else:
-                coincidences_found = soup.findAll('div', class_='dltorrent')    
+            rospy.logdebug("T2:         Retrieving magnetic link with [%s]"%self.class_name)
+            #soup = self.http_request(link)
+            soup, time_, returned_code = self.http_request_timed(link)
+            
+            if returned_code != 200:
+                rospy.logwarn("T2:         Returned code [%s] captured page [%s]"% (str(returned_code), link))
+
+            coincidences_found = soup.findAll('div', class_='dltorrent')    
+            if len(coincidences_found)<1:
+                rospy.logwarn('T2:         Tag [dltorrent] not found')
+                rospy.logdebug('T2:         Retrying magnetic link retrieving')
+                coincidences_found = soup.findAll('div', class_='dltorrent')
                 if len(coincidences_found)<1:
-                    rospy.logwarn('  Tag [dltorrent] not found')
-                    rospy.logdebug('  Retrying to get magnetic link')
-                    coincidences_found = soup.findAll('div', class_='dltorrent')
-                    if len(coincidences_found)<1:
-                        return magnet
-                    else:
-                        rospy.logdebug('  Found dltorrent!!!')
-                magnet = soup.findAll('div', class_='dltorrent')[2].a['href']
+                    return magnet
+                else:
+                    rospy.logdebug('T2:         Not found dltorrent!!!')
+            magnet = soup.findAll('div', class_='dltorrent')[2].a['href']
                     
         except Exception as inst:
           ros_node.ParseException(inst)
