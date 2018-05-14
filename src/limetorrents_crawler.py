@@ -142,23 +142,19 @@ class LimeTorrentsCrawler(Config):
                 self.page_fetch_time= time.time() - self.start_time
                 rospy.logdebug("  +   Returned status code: %d for URL %s" % (returned_code, url))
             except (requests.exceptions.ConnectionError, requests.exceptions.ReadTimeout) as e:
-                self.logger.error(e)
                 rospy.logwarn('HTTP request failed for: %s'%str(url))
                 return -1, self.page_fetch_time, returned_code
             except KeyboardInterrupt as e:
-                self.logger.exception(e)
-                print("Aborted!")
-#             print "===> 2returned_code:", returned_code
-#             print "===> 2raw.type:", type(self.raw)
-#             print "===> 2raw.type.check:", isinstance(self.raw, requests.models.Response)
+                print("Keyboard interrupted Aborted!")
+            
+            ## Getting response
             if isinstance(self.raw, requests.models.Response):
-                self.raw                = self.raw.content
-            self.soup               = BeautifulSoup(self.raw, 'lxml')
-            return self.soup, self.page_fetch_time, returned_code
+                self.raw            = self.raw.content
+            soup                    = BeautifulSoup(self.raw, 'lxml')
+            return soup, self.page_fetch_time, returned_code
+
         except KeyboardInterrupt as e:
-            print("Aborted!")
-            ##sys.exit(2)
-            self.logger.exception(e)
+            print("Keyboard interrupted Aborted!")
 
     def get_magnet_ext(self, link):
         """
