@@ -112,20 +112,16 @@ class LimeTorrentsCrawler(Config):
                 returned_code   = self.raw.status_code
                 rospy.logdebug("  +   Returned status code: %d for url %s" % (returned_code, url))
             except (requests.exceptions.ConnectionError, requests.exceptions.ReadTimeout) as e:
-                self.logger.error(e)
+                print(e)
                 rospy.logwarn('HTTP request failed for: %s'%str(url))
                 return None, returned_code
-#             print "oooo> 1returned_code:", returned_code
-#             print "oooo> 1raw.type:", type(self.raw)
-#             print "oooo> 1raw.type.check:", isinstance(self.raw, requests.models.Response)
-            #print "oooo> 1raw.content:", len ([i for i in self.raw.__dict__.keys() if 'content' in i])
             if isinstance(self.raw, requests.models.Response):
                 self.raw = self.raw.content
-            self.soup = BeautifulSoup(self.raw, 'lxml')
-            return self.soup
+            soup = BeautifulSoup(self.raw, 'lxml')
+            return soup
         except KeyboardInterrupt as e:
-            print("Aborted!")
-            self.logger.exception(e)
+            print("Keyboard interrupted Aborted!")
+            print(e)
         except Exception as inst:
           ros_node.ParseException(inst)
     
