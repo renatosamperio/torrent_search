@@ -18,10 +18,12 @@ from hs_utils.mongo_handler import MongoAccess
 from bs4 import BeautifulSoup
 from collections import Counter
 from torrench.utilities.Config import Config
-#from pandas_datareader.io.wb import search
 
-# from pandas.io import data, wb
-# from pandas_datareader import data, wb
+## Setting UTF-8 as default
+reload(sys)
+sys.setdefaultencoding('utf8')
+
+## TODO: Make ascii input raw data, line: 112
 
 class LimeTorrentsCrawler(Config):
     """
@@ -37,22 +39,20 @@ class LimeTorrentsCrawler(Config):
     def __init__(self, **kwargs):
         """Initialisations."""
         try:
-            self.condition  = threading.Condition()
-            self.complete_cond  = threading.Condition()
+            self.condition      = threading.Condition()
+#             self.complete_cond  = threading.Condition()
             Config.__init__(self)
             ## Initialising class variables
             self.class_name = self.__class__.__name__.lower()
-        
+
             self.title      = None
             self.search_type= None
             self.with_magnet= None
             self.pages      = None
-            self.collection = None
-            self.database   = None
             self.db_handler = None
-            self.with_db    = False 
-            self.thread1_running = True
-            self.thread2_running = True
+            self.soup_dict  = None
+            self.thread1_running = threading.Event()
+            self.thread2_running = threading.Event()
             
             for key, value in kwargs.iteritems():
                 if "title" == key:
@@ -63,12 +63,12 @@ class LimeTorrentsCrawler(Config):
                     self.search_type = value
                 elif "with_magnet" == key:
                     self.with_magnet = value
-                elif "collection" == key:
-                    self.collection = value
-                elif "database" == key:
-                    self.database = value
-                elif "with_db" == key:
-                    self.with_db = value
+                elif "db_handler" == key:
+                    rospy.logdebug('   --> Defined DB handler')
+                    self.db_handler = value
+                elif "soup_dict" == key:
+                    rospy.logdebug('   --> Defined shared queue')
+                    self.soup_dict = value
                 
             self.proxies    = self.get_proxies('limetorrents')
             self.proxy      = None
@@ -81,8 +81,9 @@ class LimeTorrentsCrawler(Config):
             self.masterlist_crossite = []
             self.mapper     = []
             ## self.soup_dict  = {}
-            self.soup_dict  = Queue.Queue()
+            #self.soup_dict  = Queue.Queue()
             self.missed     = Queue.Queue()
+            self.missed_links = Queue.Queue()
             self.soup       = None
             self.headers    = ['NAME', 'INDEX', 'SIZE', 'SE/LE', 'UPLOADED']
             ## self.key1       = 'magnet:?xt=urn:btih:'
@@ -94,13 +95,8 @@ class LimeTorrentsCrawler(Config):
             self.crawler_finished = False
             self.parser_finished = False
             
-            
-            if self.with_db:
-                rospy.logdebug("  + Generating database [%s] in [%s] collections"% 
-                                  (self.database, self.collection))
-                self.db_handler = MongoAccess(debug=False)
-                self.db_handler.connect(self.database, self.collection)
-                
+            ## Initialising processes for crawing and parsing 
+            self.Init()    
         except Exception as inst:
           ros_node.ParseException(inst)
 
