@@ -10,7 +10,6 @@ import json
 
 from optparse import OptionParser, OptionGroup
 from hs_utils import ros_node
-#from limetorrents_crawler import LimeTorrentsCrawler
 from controller import TorrentsController
 
 from std_msgs.msg import Bool
@@ -42,7 +41,7 @@ class CrawlerNode(ros_node.RosNode):
             self.title             = None
             self.database          = None
             self.collection        = None
-            self.lmt               = None 
+            self.controller        = None 
             
             ## Parsing arguments
             for key, value in kwargs.iteritems():
@@ -77,7 +76,7 @@ class CrawlerNode(ros_node.RosNode):
             
         except Exception as inst:
               ros_node.ParseException(inst)
-              
+
     def Init(self):
         try:
             ## Getting environment variables
@@ -95,10 +94,10 @@ class CrawlerNode(ros_node.RosNode):
             rospy.Timer(rospy.Duration(0.5), self.Run, oneshot=True)
             
             ## Initialising lime torrents crawler
-            if self.lmt is None:
-                rospy.loginfo('Creating Lime torrent crawler')
+            if self.controller is None:
+                rospy.loginfo('+ Creating Lime torrent crawler')
                 args = {}
-                self.lmt    = TorrentsController(**args)
+                self.controller = TorrentsController(**args)
         except Exception as inst:
               ros_node.ParseException(inst)
  
@@ -131,7 +130,7 @@ class CrawlerNode(ros_node.RosNode):
                 else:
                     rate_sleep = rospy.Rate(1.0)
                     rate_sleep.sleep()
-                    self.lmt.collect_data(**args)
+                    self.controller.collect_data(**args)
         except Exception as inst:
               ros_node.ParseException(inst)
               
