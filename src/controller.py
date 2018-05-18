@@ -173,15 +173,21 @@ class TorrentsController(LimeTorrentsCrawler):
             self.SetParameteres(**kwargs)
             
             ## Connecting to DB
-            self.ConnectDB()
+            handler = self.ConnectDB()
+            kwargs.update({'db_handler': handler})
+            kwargs.update({'soup_dict': self.soup_dict})
             
-            with self.run_parser:
-                rospy.logdebug('  + Setting parser')
-                self.run_parser.notifyAll()
+            ## Created lime torrents crawler
+            rospy.logdebug("=> Created lime torrent craler")
+            self.crawler = LimeTorrentsCrawler(**kwargs)
             
             with self.run_crawler:
                 rospy.logdebug('  + Setting craler')
                 self.run_crawler.notifyAll()
+            
+            with self.run_parser:
+                rospy.logdebug('  + Setting parser')
+                self.run_parser.notifyAll()
             
         except Exception as inst:
           ros_node.ParseException(inst)
