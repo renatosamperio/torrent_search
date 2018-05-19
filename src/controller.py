@@ -97,7 +97,6 @@ class TorrentsController(LimeTorrentsCrawler):
 
     def start_crawler(self, cond=None):
         try:
-            rate_sleep = rospy.Rate(1.0/3.0)
             while not rospy.is_shutdown():
                 ## Waiting for next command
                 with self.run_crawler:
@@ -106,7 +105,7 @@ class TorrentsController(LimeTorrentsCrawler):
                 
                 ## Starting crawler
                 rospy.logdebug('T1: Starting crawler')
-                rate_sleep.sleep()
+                self.crawler.get_html()
                 self.crawler_finished = True
                 
                 ## Call complete DB process
@@ -118,7 +117,6 @@ class TorrentsController(LimeTorrentsCrawler):
 
     def start_parser(self, cond=None):
         try:
-            rate_sleep = rospy.Rate(1.0/7.0)
             while not rospy.is_shutdown():
                 with self.run_parser:
                     rospy.logdebug("T2: Waiting for command to parser...")
@@ -126,7 +124,7 @@ class TorrentsController(LimeTorrentsCrawler):
                 
                 ## Starting parser
                 rospy.logdebug('T2: Starting parser')
-                rate_sleep.sleep()
+                self.crawler.parse_html()
                 self.parser_finished = True
                 
                 ## Call complete DB process
