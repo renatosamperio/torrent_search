@@ -18,8 +18,9 @@ from hs_utils.mongo_handler import MongoAccess
 from bs4 import BeautifulSoup
 from collections import Counter
 from torrench.utilities.Config import Config
+from limetorrents_crawler import LimeTorrentsCrawler
 
-class TorrentsController(Config):
+class TorrentsController(LimeTorrentsCrawler):
 
     def __init__(self, **kwargs):
         """Initialisations."""
@@ -28,16 +29,18 @@ class TorrentsController(Config):
             self.run_parser     = threading.Condition()
             self.run_complete_db= threading.Condition()
             
-            self.db_handler = None
-            self.title      = None
-            self.pages      = None
-            self.search_type= None
-            self.with_magnet= None
-            self.collection = None
-            self.database   = None
-            self.with_db    = False 
+            self.db_handler         = None
+            self.title              = None
+            self.pages              = None
+            self.search_type        = None
+            self.with_magnet        = None
+            self.collection         = None
+            self.database           = None
+            self.crawler            = None
+            self.with_db            = False 
             self.crawler_finished   = False 
             self.parser_finished    = False 
+            self.soup_dict          = Queue.Queue()
             
             self.SetParameteres(**kwargs)
             
@@ -69,6 +72,8 @@ class TorrentsController(Config):
 
         except Exception as inst:
             ros_node.ParseException(inst)
+        finally:
+            return self.db_handler
 
     def SetParameteres(self, **kwargs):
         try:  
