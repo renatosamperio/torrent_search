@@ -399,7 +399,7 @@ class LimeTorrentsCrawler(Config):
                 results             = content.findAll('tr')
                 for result in results[1:]:
                     ## Increasing links processed counter
-                    link_parsed =+ 1
+                    link_parsed += 1
                     
                     data            = result.findAll('td')
                     # try block is limetorrents-specific. Means only limetorrents requires this.
