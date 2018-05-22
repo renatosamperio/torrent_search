@@ -643,72 +643,7 @@ class LimeTorrentsCrawler(Config):
         finally:
             return result
     
-    def Update_TimeSeries_Day(self, item, item_index, items_id):
-        '''
-        Generate a time series model 
-        https://www.mongodb.com/blog/post/schema-design-for-time-series-data-in-mongodb
-        '''
-        result = False
-        try:
-            ## Check if given item already exists, otherwise
-            ## insert new time series model for each item ID
-            keyItem                 = item[item_index]
-            condition               = {item_index: keyItem}
-            posts                   = self.db_handler.Find(condition)
-            datetime_now            = datetime.datetime.utcnow()
-            postsSize               = posts.count()
-            
-            ## We can receive more than one time series item
-            ## to update per call in the same item
-            #TODO: Do a more efficient update/insert for bulk items
-            if postsSize < 1:
-                ## Prepare time series model for time series
-                def get_day_timeseries_model(value, datetime_now):
-                    return { 
-                        "timestamp_day": datetime_now.year,
-                        "value": {
-                            str(datetime_now.month): {
-                                str(datetime_now.day) : value
-                            }
-                        }
-                    };
-                for key_item in items_id:
-                    item[key_item]   = get_day_timeseries_model(item[key_item], datetime_now)
-                ## Inserting time series model
-                post_id             = self.db_handler.Insert(item)
-                rospy.logdebug("T2:  -     Inserted time series item with hash [%s] in collection [%s]"% 
-                                  (keyItem, self.db_handler.coll_name))
-                result = post_id is not None
-            else:
-                if postsSize>1:
-                    rospy.logdebug('   Warning found [%d] items for [%s]'
-                                      %(postsSize, keyItem))
-                for post in posts:  ## it should be only 1 post!
-                    ## 1) Check if there are missing or extra keys
-                    updated_missing = self.AddMissingKeys(copy.deepcopy(post), item)
-                    if updated_missing:
-                        rospy.logdebug('T2:    2.4.1) Added item  [%s] into DB ', keyItem)
-                    else:
-                        rospy.logdebug('T2:    2.4.2) DB Updated failed or no added key in item [%s]', keyItem)
-                    
-                    ## 2) Check if items for HASH already exists
-                    ts_updated      = self.UpdateBestSeriesValue(post, 
-                                                                 item, 
-                                                                 item_index, 
-                                                                 items_id)
-                    if ts_updated:
-                        rospy.logdebug('T2:    2.4.3) Time series updated for [%s]', keyItem)
-                    else:
-                        rospy.logdebug('T2:    2.4.4) DB Updated failed or time series not updated for [%s]', keyItem)
-                    result              = updated_missing and ts_updated
-                    
-        except Exception as inst:
-            result = False
-            ros_node.ParseException(inst)
-        finally:
-            return result
-
-    def GetBaseData(self, data, page):
+    def GetWebData(self, data, page):
         element = None
         try:
             ## Getting hash
