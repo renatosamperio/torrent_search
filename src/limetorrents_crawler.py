@@ -374,106 +374,44 @@ class LimeTorrentsCrawler(Config):
                 page                = soupKeys[0]
                 rospy.logdebug("T2:  2.2) Getting page [%d]"%(page+1))
                 soup                = soupDict[page]
-                
+
                 ## Verifying soup is valid
                 if not isinstance(soup, bs4.BeautifulSoup):
                     rospy.logerr("T2:Invalid HTML search item")
-                    
+
                 ## Looking for table components
                 content             = soup.find('table', class_='table2')
                 rospy.logdebug("T2:  2.3) Looking for torrent data in page [%d]"%(page+1))
                 if content is None:
                     rospy.logerr("T2:Invalid parsed content")
                     return
-                
+
                 results             = content.findAll('tr')
                 for result in results[1:]:
                     ## Increasing links processed counter
                     link_parsed += 1
-                    
+
+                    ## Getting source data
+                    rospy.logdebug("T2:  2.4) Updating item data")
                     data            = result.findAll('td')
-                    # try block is limetorrents-specific. Means only limetorrents requires this.
-                    tag_found       = data[0].findAll('a')
-                    link_index      = len(tag_found)-1
-                    name            = tag_found[link_index].string
-                    link            = tag_found[link_index]['href']
-                    link            = (self.proxy+link).encode('ascii', 'ignore').decode('ascii')
-                    date            = data[1].string
-                    date            = date.split('-')[0]
-                    size            = data[2].string
-                    seeds           = data[3].string.replace(',', '')
-                    leeches         = data[4].string.replace(',', '')
-                    seeds_color     = self.colorify("green", seeds)
-                    leeches_color   = self.colorify("red", leeches)
                     
-                    self.index      += 1
-                    self.mapper.insert(self.index, (name, link, self.class_name))
-                    self.mylist     = [name, "--" +
-                                    str(self.index) + "--", size, seeds_color+'/'+
-                                    leeches_color, date]
-                    self.masterlist.append(self.mylist)
-                    self.mylist_crossite = [name, self.index, size, seeds+'/'+leeches, date]
-                    self.masterlist_crossite.append(self.mylist_crossite)
-                    
-                    element         = {
-                        'name': name,
-                        'date': date,
-                        'size': size,
-                        'seeds': seeds,
-                        'leeches': leeches,
-                        'link': link,
-                        'page': page+1
-                    }
-
-                    ## Getting hash
-                    torrent_file    = data[0].findAll('a')[0]['href']
-                    start_index     = torrent_file.find(self.key1)+len(self.key1)
-                    end_index       = torrent_file.find(self.key2)
-                    hash            = torrent_file[start_index:end_index]
-                    element.update({'hash': hash})
-                    element.update({'torrent_file': torrent_file})
-                    
-                    ## Getting available images
-                    images          = data[0].findAll('img')
-                    qualifiers      = []
-                    if len(images) > 0:
-                        for image in images:
-                            qualifiers.append(image['title'])
-                        element.update({'qualifiers': qualifiers})
-
-                    ## Getting magnet link
-                    if self.with_magnet:
-                        rospy.logdebug("T2:  2.3.1) Getting magnet link")
-                        magnetic_link = self.get_magnet_ext(link)
-                        if magnetic_link is None:
-                            rospy.logwarn('T2:  No available magnet for [%s] with link [%s]'%
-                                          (hash, str(link)))
-                            
-                            ## Adding element to missing links list
-                            self.missed_links.put(element)
-                            rospy.logwarn('T2:  2.3.2) Added [%s] to missing links, size [%s]'%
-                                          (hash, str(self.missed_links.qsize())))
-                            waiting_time = 30 
-                            rospy.loginfo("T2:  2.3.3) Waiting for [%d]s:"%waiting_time)
-                            time.sleep(waiting_time)
-
-                            magnetic_link = ''
-                        element.update({'magnetic_link': magnetic_link})
+                    ## This method collects data from opened URL
+                    ##     and updates content accordingly
+                    element, dbItem = self.UpdateElement(data)
+                    if element is None:
+                        rospy.logdebug("T2:  Element not updated")
+                        return
 
                     ## Inserting in database
                     if self.db_handler is not None:
-                        rospy.logdebug("T2:  2.4) [%d.%d] Appending in database [%s]"%
+                        rospy.logdebug("T2:  2.6) [%d.%d] Appending in database [%s]"%
                                        (pages_parsed+1, (link_parsed+1), element['hash']))
-                        result = self.Update_TimeSeries_Day(element, 
-                                                    'hash',         ## This is the item key, it should be unique!
-                                                    ['seeds', 'leeches'],  ## These items are defined in a time series
-                                                    ) 
+                        result = self.UpdateTimeSeries(element, dbItem, ['seeds', 'leeches'])
                         if not result:
                             rospy.logerr("T2:DB insertion failed")
                     
                 ## Incremented torrents got magentic link
                 pages_parsed += 1
-
                 rospy.logdebug("T2: Remaining torrent pages [%s]"%(self.soup_dict.qsize()))
                 if self.db_handler is not None:
                     rospy.logdebug("T2:  - Total records in DB: [%d]"%self.db_handler.Size())
@@ -491,10 +429,9 @@ class LimeTorrentsCrawler(Config):
                     else:
                         element.update({'magnetic_link': magnetic_link})
                         rospy.logdebug("T2:  + Appending in database [%s]"%element['hash'])
-                        result = self.Update_TimeSeries_Day(element, 
-                                        'hash',         ## This is the item key, it should be unique!
-                                        ['seeds', 'leeches'],  ## These items are defined in a time series
-                                        ) 
+                        
+                        ## BUG: This method updates only attributes leeches and seeds 
+                        result = self.UpdateTimeSeries(element, dbItem, ['seeds', 'leeches'])
                         if not result:
                             rospy.logerr("T2:  + DB insertion failed")
                 
