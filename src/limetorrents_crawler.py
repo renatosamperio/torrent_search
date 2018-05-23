@@ -286,8 +286,7 @@ class LimeTorrentsCrawler(Config):
                 
                 if str(type(self.soup)) == 'bs4.BeautifulSoup':
                     rospy.logerr("T1:Invalid HTML search type [%s]"%str(type(self.soup)))
-                    waiting_time = 30 
-                    rospy.loginfo("T1:       Waiting for [%d]s:"%waiting_time)
+                    rospy.loginfo("T1:       Waiting for [%d]s:"%self.waiting_time)
                     time.sleep(waiting_time)
                     pages_queue.put(page)
                     continue
@@ -295,12 +294,11 @@ class LimeTorrentsCrawler(Config):
                 if returned_code != 200:
                     rospy.logwarn("T1:Returned code [%s] captured page [%s]"% (str(returned_code), search_url))
                     self.missed.put(search_url)
-                    waiting_time = 30
-                    rospy.loginfo("T1:       Waiting for [%d]s:"%waiting_time)
+                    rospy.loginfo("T1:       Waiting for [%d]s:"%self.waiting_time)
                     with self.condition:
                         rospy.logdebug("T1:       Notifying html parsing with error code [%s]"%str(returned_code))
                         self.condition.notifyAll()
-                    time.sleep(waiting_time)
+                    time.sleep(self.waiting_time)
                     pages_queue.put(page)
                     continue
                     
@@ -480,18 +478,16 @@ class LimeTorrentsCrawler(Config):
         
                 if str(type(soup)) == 'bs4.BeautifulSoup':
                     rospy.logwarn("T3: Invalid HTML search type [%s]"%str(type(soup)))
-                    waiting_time = 30 
-                    rospy.loginfo("T3:       Waiting for [%d]s:"%waiting_time)
-                    time.sleep(waiting_time)
+                    rospy.loginfo("T3:       Waiting for [%d]s:"%self.waiting_time)
+                    time.sleep(self.waiting_time)
                     posts_queue.put(post)
                     continue
                 
                 if returned_code != 200:
                     rospy.logwarn("T3: Returned code [%s] captured page [%s]"% (str(returned_code), search_url))
                     self.missed.put(search_url)
-                    waiting_time = 30 
-                    rospy.loginfo("T3:       Waiting for [%d]s:"%waiting_time)
-                    time.sleep(waiting_time)
+                    rospy.loginfo("T3:       Waiting for [%d]s:"%self.waiting_time)
+                    time.sleep(self.waiting_time)
                     posts_queue.put(post)
                     continue
                     
