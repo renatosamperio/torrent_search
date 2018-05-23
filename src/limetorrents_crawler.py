@@ -40,7 +40,6 @@ class LimeTorrentsCrawler(Config):
         """Initialisations."""
         try:
             self.condition      = threading.Condition()
-#             self.complete_cond  = threading.Condition()
             Config.__init__(self)
             ## Initialising class variables
             self.class_name = self.__class__.__name__.lower()
@@ -72,22 +71,13 @@ class LimeTorrentsCrawler(Config):
                 
             self.proxies    = self.get_proxies('limetorrents')
             self.proxy      = None
-            self.index      = 0
-            self.page       = 0
             self.total_fetch_time = 0
-            self.mylist     = []
-            self.masterlist = []
-            self.mylist_crossite = []
-            self.masterlist_crossite = []
-            self.mapper     = []
-            ## self.soup_dict  = {}
-            #self.soup_dict  = Queue.Queue()
+            self.waiting_time = 30
+
             self.missed     = Queue.Queue()
             self.missed_links = Queue.Queue()
             self.soup       = None
             self.headers    = ['NAME', 'INDEX', 'SIZE', 'SE/LE', 'UPLOADED']
-            ## self.key1       = 'magnet:?xt=urn:btih:'
-            ## self.key2       = '&'
             self.key1       = 'http://itorrents.org/torrent/'
             self.key2       = '.torrent?'
             
