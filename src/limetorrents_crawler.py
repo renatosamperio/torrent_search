@@ -317,7 +317,7 @@ class LimeTorrentsCrawler(Config):
                         self.condition.notifyAll()
                         page_counter += 1
             
-            rospy.loginfo("T1:  + Got [%d] pages and finished with [%d] and missing [%d]"%
+            rospy.loginfo("T1:  + FINISHED: Got [%d] pages and finished with [%d] and missed [%d]"%
                               (page_counter, pages_queue.qsize(), self.missed.qsize()))
 
             self.crawler_finished = True
@@ -326,9 +326,8 @@ class LimeTorrentsCrawler(Config):
             ros_node.ParseException(inst)
         finally:
             ## Clearing thread flag
-            print "CRAWLER FINISHED!!!"
             self.thread1_running.clear()
-
+    
     def parse_html(self):
         """
         Parse HTML to get required results.
@@ -355,8 +354,7 @@ class LimeTorrentsCrawler(Config):
                     with self.condition:
                         rospy.logdebug("T2:  < B > Waiting for HTML crawler notification...")
                         self.condition.wait()
-                        rospy.logwarn("T2:  < C > Got notified  and GET_HTML %s" % (state))
-                        #continue
+                        rospy.logdebug("T2:  < C > Got notified  and GET_HTML %s" % (state))
                 
                 ## Acquiring lock for processing queue of retrieved pages
                 with self.lock:
@@ -390,7 +388,8 @@ class LimeTorrentsCrawler(Config):
                     link_parsed += 1
 
                     ## Getting source data
-                    rospy.logdebug("T2:  2.4) Updating item data")
+                    rospy.logdebug("    "+("  --"*5))
+                    rospy.logdebug("T2:  2.4) Updating parsed web element")
                     data            = result.findAll('td')
                     
                     ## This method collects data from opened URL
@@ -469,9 +468,7 @@ class LimeTorrentsCrawler(Config):
             
             while not posts_queue.empty():
                 post = posts_queue.get()
-                ##pprint.pprint(post)
                 search_url  = post['link'].encode("utf-8")
-#                     print "===> search_url:", search_url
                 rospy.logdebug("T3:      3.2.1) Looking into URL")
                 
                 soup, time_, returned_code = self.http_request_timed(search_url)
@@ -603,7 +600,7 @@ class LimeTorrentsCrawler(Config):
                     result              = self.db_handler.Update(condition, subs_item_id)
                     rospy.logdebug("T2:           Added [%s] series item for [%s/%s] with hash [%s] in collection [%s]"% 
                               (key, str(datetime_now.month), str(datetime_now.day), hash, self.db_handler.coll_name))
-                        
+
         except Exception as inst:
             ros_node.ParseException(inst)
         finally:
@@ -651,7 +648,7 @@ class LimeTorrentsCrawler(Config):
             start_index     = torrent_file.find(self.key1)+len(self.key1)
             end_index       = torrent_file.find(self.key2)
             hash            = torrent_file[start_index:end_index]
-            rospy.logdebug("T2:  2.4.1) Got hash [%s]"%(hash))
+            rospy.logdebug("T2:    2.4.1) Got hash [%s]"%(hash))
             
             # try block is limetorrents-specific. Means only limetorrents requires this.
             tag_found       = data[0].findAll('a')
@@ -666,7 +663,7 @@ class LimeTorrentsCrawler(Config):
             size            = data[2].string
             seeds           = data[3].string.replace(',', '')
             leeches         = data[4].string.replace(',', '')
-            rospy.logdebug("T2:  2.4.2) Parsed element data"%(hash))
+            rospy.logdebug("T2:    2.4.2) Parsed element data for [%s]"%str(hash))
             
             element         = {
                 'name':         name,
@@ -697,28 +694,28 @@ class LimeTorrentsCrawler(Config):
         try:
             element = self.GetBaseData(data)
             if element is None:
-                rospy.logdebug("T2:  2.4.3) Built invalid element")
-                return result
+                rospy.logdebug("T2:    2.4.3) Built invalid element")
+                return element
             
             ## Looking existing record
-            hash            = elementp['hash']
-            ospy.logdebug("T2:  2.5) Looking for existing record of [%s]"%hash)
+            hash            = element['hash']
+            rospy.logdebug("T2  2.5) Looking for existing record of [%s]"%hash)
             posts           = self.db_handler.Find({'hash': hash })
             postsSize       = posts.count()
             if postsSize < 1:
-                rospy.logwarn("T2: 2.5.1 Element [%s] did not exist"%(hash))
+                rospy.logwarn("T2:    2.5.1) Element [%s] did not exist"%(hash))
                 
                 ## Update magnet
                 element     = self.GetMagnet(element)
                 dbItem      = None
             else:
                 if postsSize > 1:
-                    rospy.logwarn("T2: 2.5.1 Element [%s] has multiple instances"%(hash))
+                    rospy.logwarn("T2:    2.5.1) Element [%s] has multiple instances"%(hash))
                 else:
-                    rospy.logwarn("T2: 2.5.1 Element [%s] found"%(hash))
+                    rospy.logdebug("T2:    2.5.1) Element [%s] found"%(hash))
             
                 ## Collecting existing post in DB
-                dbItem          = posts[0]
+                dbItem      = posts[0]
                 
                 ## Notify element changes and update different attribuues
                 ##  ...
@@ -734,21 +731,22 @@ class LimeTorrentsCrawler(Config):
             hash = element['hash']
             
             ## Getting magnet link
-            rospy.logdebug("T2:  2.5.2) Getting magnet link")
-            magnetic_link = self.get_magnet_ext(link)
+            hash            = element['hash']
+            link            = element['link']
+            magnetic_link   = self.get_magnet_ext(link)
             if magnetic_link is None:
-                rospy.logwarn('T2:         No available magnet for [%s] with link [%s]'%
+                rospy.logwarn('T2:+  No available magnet for [%s] with link [%s]'%
                               (hash, str(link)))
                 
                 ## Adding element to missing links list
                 self.missed_links.put(element)
-                rospy.logwarn('T2:  2.5.2.1) Added [%s] to missing links, size [%s]'%
+                rospy.logwarn('T2:+  Added [%s] to missing links, size [%s]'%
                               (hash, str(self.missed_links.qsize())))
-                rospy.loginfo("T2:  2.5.2.2) Waiting for [%d]s:"%self.waiting_time)
+                rospy.loginfo("T2:+  Waiting for [%d]s:"%self.waiting_time)
                 time.sleep(self.waiting_time)
 
                 magnetic_link = ''
-            rospy.logwarn("T2:T2:  2.5.3) Updating magnet link for [%s]"%(hash))
+            rospy.logdebug("T2:+  Updating magnet link for [%s]"%(hash))
             element.update({'magnetic_link': magnetic_link})        
         except Exception as inst:
           ros_node.ParseException(inst)
@@ -765,6 +763,7 @@ class LimeTorrentsCrawler(Config):
             ## Get current date
             datetime_now    = datetime.datetime.utcnow()
             hash            = element['hash']
+            rospy.logdebug("T2:    2.5.4) Updating time series section for [%s]"%hash)
             
             ## If element does not exists in DB,
             ##    Generate a new time series item
@@ -782,6 +781,8 @@ class LimeTorrentsCrawler(Config):
                 
                 ## Generate time series schema for each
                 ##    required key item (seeds, leeches)
+                
+                rospy.logdebug('T2:    2.5.4.1) Generating time series schema for [%s]', hash)
                 for key_item in items_id:
                     element[key_item]   = get_day_timeseries_model(element[key_item], datetime_now)
                     
