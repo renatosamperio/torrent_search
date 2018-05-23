@@ -547,42 +547,6 @@ class LimeTorrentsCrawler(Config):
             ## Generating one shot threads
         except Exception as inst:
           ros_node.ParseException(inst)
-        
-    def Run(self):
-        '''
-        Looks for all browse movies and parses HTML in two threads. 
-        Then, updates any non feature torrent in DB 
-        '''
-        try:
-            rospy.logdebug("Obtaining proxies...")
-            proxy_ok = self.check_proxy()
-            if proxy_ok:
-                rospy.logdebug("Preparing threads")
-                condition = threading.Condition()
-                html_crawler = threading.Thread(
-                    name='html_crawler', 
-                    target=self.get_html, 
-                    args=(condition,))
-                html_parser  = threading.Thread(
-                    name='html_parser',  
-                    target=self.parse_html, 
-                    args=(condition,))
-                
-                html_parser.start()
-                html_crawler.start()
-                
-                html_crawler.join()
-                html_parser.join()
-                
-                crawler_db  = threading.Thread(
-                    name='crawler_db',  
-                    target=self.complete_db, 
-                    args=(condition,))
-                crawler_db.start()
-                crawler_db.join()
-
-        except Exception as inst:
-          ros_node.ParseException(inst)
 
     def UpdateBestSeriesValue(self, db_post, web_element, item_index, items_id):
         '''
