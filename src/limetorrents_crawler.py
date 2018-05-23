@@ -548,7 +548,7 @@ class LimeTorrentsCrawler(Config):
         except Exception as inst:
           ros_node.ParseException(inst)
 
-    def UpdateBestSeriesValue(self, db_post, web_element, item_index, items_id):
+    def UpdateBestSeriesValue(self, db_post, web_element, items_id):
         '''
         Comparator for time series update to check if for today already exists a value. 
         Could possible be if torrent hash is repeated in the website. 
@@ -557,8 +557,14 @@ class LimeTorrentsCrawler(Config):
         '''
         result      = True
         try:
+            hash    = db_post['hash']
             postKeys = db_post.keys()
+            
+            ## Look for each time series item
             for key in items_id:
+                
+                ## Look for each time series element
+                ##    of existing DB element
                 if key in postKeys:
                     datetime_now        = datetime.datetime.utcnow()
                     month               = str(datetime_now.month)
@@ -572,39 +578,35 @@ class LimeTorrentsCrawler(Config):
                     ## Checking if day exists
                     day                 = str(datetime_now.day)
                     day_exist           = day in db_post[key]['value'][month].keys()
-                     
-                    ## If day already exists check if it is better the one given 
-                    ## right now by the webiste
                     
-                    condition           = { item_index : web_element[item_index] }
-                    set_key             = key+".value."+str(datetime_now.month)+"."+str(datetime_now.day)
-                    subs_item_id        = {set_key: web_element[key] }
+                    ## If is value found in the website is bigger, use this one
+                    ## otherwise let the one existing in the database
                     if day_exist:
-                        ## If is value found in the website is bigger, use this one
-                        ## otherwise let the one existing in the database
                         todays_db       = db_post[key]['value'][month][day]
                         todays_website  = web_element[key]
                         isTodayBetter   = todays_db < todays_website
                         
                         ## TODO: We should know the page of both items
-                        #print "=== [",datetime_now.month, "/", datetime_now.day,"], todays_db >= todays_website:", todays_db, '>=', todays_website
                         isTodayWorse    = todays_db >= todays_website
                         if isTodayWorse:
                             rospy.logdebug("T2:           Existing value for [%s] similar or better", key)
                         
                         # Updating condition and substitute values
                         elif isTodayBetter:
-                            ## result = True
-                            result      = self.db_handler.Update(condition, subs_item_id)
-                            rospy.logdebug("T2:           Updated [%s] series item with hash [%s] in collection [%s]"% 
-                                      (key, web_element[item_index], self.db_handler.coll_name))
+                            rospy.logdebug("T2:           Updating [%s] series item with hash [%s] in collection [%s]"% 
+                                      (key, hash, self.db_handler.coll_name))
                         
+                     
+                    ## If day already exists check if it is better the one given 
+                    ## right now by the website
+                    set_key             = key+".value."+str(datetime_now.month)+"."+str(datetime_now.day)
+                    subs_item_id        = {set_key: web_element[key] }
+                    
                     ## if day is missing, add it!
-                    else:
-                        ## result = True
-                        result          = self.db_handler.Update(condition, subs_item_id)
-                        rospy.logdebug("T2:           Added [%s] series item for [%s/%s] with hash [%s] in collection [%s]"% 
-                                  (key, str(datetime_now.month), str(datetime_now.day), web_element[item_index], self.db_handler.coll_name))
+                    condition           = { 'hash' : hash }
+                    result              = self.db_handler.Update(condition, subs_item_id)
+                    rospy.logdebug("T2:           Added [%s] series item for [%s/%s] with hash [%s] in collection [%s]"% 
+                              (key, str(datetime_now.month), str(datetime_now.day), hash, self.db_handler.coll_name))
                         
         except Exception as inst:
             ros_node.ParseException(inst)
