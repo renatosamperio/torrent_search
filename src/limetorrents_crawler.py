@@ -622,19 +622,16 @@ class LimeTorrentsCrawler(Config):
             postKeys            = db_post.keys()
             postKeysCounter     = Counter(postKeys)
             elementKeysCounter  = Counter(elementKeys)
-            extra_in_db         = (postKeysCounter - elementKeysCounter).keys()
             missed_in_db        = (elementKeysCounter - postKeysCounter).keys()
            
-            for key in extra_in_db:
-                if key != '_id':
-                    rospy.logdebug('T2:  -     TODO: Remove item [%s] from DB', key)
+#             extra_in_db         = (postKeysCounter - elementKeysCounter).keys()
+#             for key in extra_in_db:
+#                 if key != '_id':
+#                     rospy.logdebug('T2:  -     TODO: Remove item [%s] from DB', key)
             
             if len(missed_in_db) > 0:
                 for key in missed_in_db:
                     rospy.logdebug('T2: -     Updated item [%s] from DB', key)
-#                     print "===>_id: ", db_post["_id"]
-#                     print "===>key:", key 
-#                     print "===>web_element:", web_element[key] 
                     result     = self.db_handler.Update(
                                     condition={"_id": db_post["_id"]}, 
                                     substitute={key: web_element[key]}, 
