@@ -710,3 +710,166 @@ class LimeTorrentsCrawler(Config):
             ros_node.ParseException(inst)
         finally:
             return result
+
+    def GetBaseData(self, data, page):
+        element = None
+        try:
+            ## Getting hash
+            torrent_file    = data[0].findAll('a')[0]['href']
+            start_index     = torrent_file.find(self.key1)+len(self.key1)
+            end_index       = torrent_file.find(self.key2)
+            hash            = torrent_file[start_index:end_index]
+            rospy.logdebug("T2:  2.4.1) Got hash [%s]"%(hash))
+            
+            # try block is limetorrents-specific. Means only limetorrents requires this.
+            tag_found       = data[0].findAll('a')
+            print "===> tag_found:", tag_found
+            print "===> tag_found.len:", len(tag_found)
+            link_index      = len(tag_found)-1
+            name            = tag_found[link_index].string
+            link            = tag_found[link_index]['href']
+            link            = (self.proxy+link).encode('ascii', 'ignore').decode('ascii')
+            date            = data[1].string
+            date            = date.split('-')[0]
+            size            = data[2].string
+            seeds           = data[3].string.replace(',', '')
+            leeches         = data[4].string.replace(',', '')
+            rospy.logdebug("T2:  2.4.2) Parsed element data"%(hash))
+            
+            element         = {
+                'name':         name,
+                'date':         date,
+                'size':         size,
+                'seeds':        seeds,
+                'leeches':      leeches,
+                'link':         link,
+                'page':         page+1,
+                'hash':         hash,
+                'torrent_file': torrent_file
+            }
+
+            ## Getting available images
+            images          = data[0].findAll('img')
+            qualifiers      = []
+            if len(images) > 0:
+                for image in images:
+                    qualifiers.append(image['title'])
+                element.update({'qualifiers': qualifiers})
+        except Exception as inst:
+          ros_node.ParseException(inst)
+        finally:
+            return element
+
+    def UpdateElement(self, data):
+        element = None
+        try:
+            element = self.GetBaseData(data)
+            if element is None:
+                rospy.logdebug("T2:  2.4.3) Built invalid element")
+                return result
+            
+            ## Looking existing record
+            hash            = elementp['hash']
+            ospy.logdebug("T2:  2.5) Looking for existing record of [%s]"%hash)
+            posts           = self.db_handler.Find({'hash': hash })
+            postsSize       = posts.count()
+            if postsSize < 1:
+                rospy.logwarn("T2: 2.5.1 Element [%s] did not exist"%(hash))
+                
+                ## Update magnet
+                element     = self.GetMagnet(element)
+                dbItem      = None
+            else:
+                if postsSize > 1:
+                    rospy.logwarn("T2: 2.5.1 Element [%s] has multiple instances"%(hash))
+                else:
+                    rospy.logwarn("T2: 2.5.1 Element [%s] found"%(hash))
+            
+                ## Collecting existing post in DB
+                dbItem          = posts[0]
+                
+                ## Notify element changes and update different attribuues
+                ##  ...
+                ##  ...
+                ##  ...
+            return element, dbItem
+                        
+        except Exception as inst:
+          ros_node.ParseException(inst)
+
+    def GetMagnet(self, element):
+        try:
+            hash = element['hash']
+            
+            ## Getting magnet link
+            rospy.logdebug("T2:  2.5.2) Getting magnet link")
+            magnetic_link = self.get_magnet_ext(link)
+            if magnetic_link is None:
+                rospy.logwarn('T2:         No available magnet for [%s] with link [%s]'%
+                              (hash, str(link)))
+                
+                ## Adding element to missing links list
+                self.missed_links.put(element)
+                rospy.logwarn('T2:  2.5.2.1) Added [%s] to missing links, size [%s]'%
+                              (hash, str(self.missed_links.qsize())))
+                rospy.loginfo("T2:  2.5.2.2) Waiting for [%d]s:"%self.waiting_time)
+                time.sleep(self.waiting_time)
+
+                magnetic_link = ''
+            rospy.logwarn("T2:T2:  2.5.3) Updating magnet link for [%s]"%(hash))
+            element.update({'magnetic_link': magnetic_link})        
+        except Exception as inst:
+          ros_node.ParseException(inst)
+        finally:
+            return element
+
+    def UpdateTimeSeries(self, element, dbItem, items_id):
+        '''
+        Generate a time series model 
+        https://www.mongodb.com/blog/post/schema-design-for-time-series-data-in-mongodb
+        '''
+        result = False
+        try:
+            ## Get current date
+            datetime_now    = datetime.datetime.utcnow()
+            hash            = element['hash']
+            
+            ## If element does not exists in DB,
+            ##    Generate a new time series item
+            if dbItem is None:
+                ## Create time series model for time series
+                def get_day_timeseries_model(value, datetime_now):
+                    return { 
+                        "timestamp_day": datetime_now.year,
+                        "value": {
+                            str(datetime_now.month): {
+                                str(datetime_now.day) : value
+                            }
+                        }
+                    };
+                
+                ## Generate time series schema for each
+                ##    required key item (seeds, leeches)
+                for key_item in items_id:
+                    element[key_item]   = get_day_timeseries_model(element[key_item], datetime_now)
+                    
+                ## Inserting time series model
+                post_id             = self.db_handler.Insert(element)
+                rospy.logdebug("T2:  -     Inserted time series item with hash [%s] in collection [%s]"% 
+                                  (hash, self.db_handler.coll_name))
+                result = post_id is not None
+            else:
+                ## 1) Check if items for HASH already exists
+                ts_updated      = self.UpdateBestSeriesValue(dbItem, element, items_id)
+                if ts_updated:
+                    rospy.logdebug('T2:    2.4.3) Time series updated for [%s]', hash)
+                else:
+                    rospy.logdebug('T2:    2.4.4) DB Updated failed or time series not updated for [%s]', hash)
+#                 result              = updated_missing and ts_updated
+                result              = updated_missing and ts_updated
+                    
+        except Exception as inst:
+            result = False
+            ros_node.ParseException(inst)
+        finally:
+            return result
