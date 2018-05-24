@@ -394,19 +394,11 @@ class LimeTorrentsCrawler(Config):
                     
                     ## This method collects data from opened URL
                     ##     and updates content accordingly
-                    element, dbItem = self.UpdateElement(data)
+                    element, dbItem = self.UpdateElement(data, pages_parsed)
                     if element is None:
                         rospy.logdebug("T2:  Element not updated")
                         return
 
-                    ## Inserting in database
-                    if self.db_handler is not None:
-                        rospy.logdebug("T2:  2.6) [%d.%d] Appending in database [%s]"%
-                                       (pages_parsed+1, (link_parsed+1), element['hash']))
-                        result = self.UpdateTimeSeries(element, dbItem, ['seeds', 'leeches'])
-                        if not result:
-                            rospy.logerr("T2:DB insertion failed")
-                    
                 ## Incremented torrents got magentic link
                 pages_parsed += 1
                 rospy.logdebug("T2: Remaining torrent pages [%s]"%(self.soup_dict.qsize()))
@@ -419,6 +411,7 @@ class LimeTorrentsCrawler(Config):
                 rospy.logwarn("T2:  + Found [%s] elements with missing link"%self.missed_links.qsize() )
                 while self.missed_links.qsize()>0:
                     element         = self.missed_links.get()
+                    link            = element['link']
                     rospy.logdebug("T2:  + Re-opening element [%s]"%element['hash'])
                     magnetic_link   = self.get_magnet_ext(link)
                     if magnetic_link is None:
