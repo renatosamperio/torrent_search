@@ -541,10 +541,11 @@ class LimeTorrentsCrawler(Config):
         
         returns True if value has been updated. Otherwise, DB update failed
         '''
-        result      = True
+        
+        result          = False
         try:
-            hash    = db_post['hash']
-            postKeys = db_post.keys()
+            hash        = db_post['hash']
+            postKeys    = db_post.keys()
             
             ## Look for each time series item
             for key in items_id:
