@@ -683,10 +683,11 @@ class LimeTorrentsCrawler(Config):
         finally:
             return element
 
-    def UpdateElement(self, data):
+    def UpdateElement(self, data, page):
         element = None
         try:
-            element = self.GetBaseData(data)
+            tsItems         = ['seeds', 'leeches']
+            element         = self.GetWebData(data, page)
             if element is None:
                 rospy.logdebug("T2:    2.4.3) Built invalid element")
                 return element
@@ -700,7 +701,7 @@ class LimeTorrentsCrawler(Config):
                 rospy.logwarn("T2:    2.5.1) Element [%s] did not exist"%(hash))
                 
                 ## Update magnet
-                element     = self.GetMagnet(element)
+                element     = self.RetrieveMagnet(element)
                 dbItem      = None
             else:
                 if postsSize > 1:
@@ -711,10 +712,44 @@ class LimeTorrentsCrawler(Config):
                 ## Collecting existing post in DB
                 dbItem      = posts[0]
                 
-                ## Notify element changes and update different attribuues
-                ##  ...
-                ##  ...
-                ##  ...
+                ## Check if DB element has a magnetic link
+                if 'magnetic_link' not in dbItem.keys() or dbItem['magnetic_link'] == None:
+                    rospy.logdebug("T2:    2.5.2) Getting magnet link")
+                    element = self.RetrieveMagnet(element)
+                else:
+                    rospy.logdebug("T2:    2.5.2) DB record has magnetic link")
+                    
+                ## Checking if current element differs from DB record
+                dbKeys      = dbItem.keys()
+                elemKeys    = element.keys()
+                hasChanged  = False
+                for ekey in elemKeys:
+                    ## If the element key does not exists in DB record
+                    ##    then log the problem
+                    updateDb            = False
+                    if ekey not in dbKeys:
+                        rospy.logwarn("T2:     2.5.3) Key [%s] do not exists in DB elements"%ekey)
+                        updateDb        = True
+
+                    ## If the element key is different to current DB 
+                    ##    record, then use the element data
+                    elif ekey not in tsItems and element[ekey] != dbItem[ekey]:
+                        updateDb        = True
+                    
+                    if updateDb:
+                        hasChanged      = True
+                        dbItem[ekey]    = element[ekey]
+                        updated_items   = {ekey: element[ekey] }
+                        query_condition = { 'hash' : hash }
+                        
+                        rospy.logdebug("T2:       Updating key [%s] in DB elements"%ekey)
+                        result          = self.db_handler.Update(query_condition, updated_items)
+                
+                if not hasChanged:
+                    rospy.logdebug("T2:       Element [%s] has not been updated"%hash)
+                
+                ## Updating time series section
+                result = self.UpdateTimeSeries(element, dbItem, tsItems)
             return element, dbItem
                         
         except Exception as inst:
