@@ -755,10 +755,8 @@ class LimeTorrentsCrawler(Config):
         except Exception as inst:
           ros_node.ParseException(inst)
 
-    def GetMagnet(self, element):
+    def RetrieveMagnet(self, element):
         try:
-            hash = element['hash']
-            
             ## Getting magnet link
             hash            = element['hash']
             link            = element['link']
