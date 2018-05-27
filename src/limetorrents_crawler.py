@@ -820,13 +820,12 @@ class LimeTorrentsCrawler(Config):
                 result = post_id is not None
             else:
                 ## 1) Check if items for HASH already exists
-                ts_updated      = self.UpdateBestSeriesValue(dbItem, element, items_id)
+                ts_updated = self.UpdateBestSeriesValue(dbItem, element, items_id)
                 if ts_updated:
-                    rospy.logdebug('T2:    2.4.3) Time series updated for [%s]', hash)
+                    rospy.logdebug('T2:    2.5.4.1) Time series updated for [%s]', hash)
                 else:
-                    rospy.logdebug('T2:    2.4.4) DB Updated failed or time series not updated for [%s]', hash)
-#                 result              = updated_missing and ts_updated
-                result              = updated_missing and ts_updated
+                    rospy.logerr('T2:    2.5.4.1) DB Updated failed or time series not updated for [%s]', hash)
+                result = ts_updated
                     
         except Exception as inst:
             result = False
