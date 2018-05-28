@@ -51,6 +51,7 @@ class LimeTorrentsCrawler(Config):
             self.db_handler = None
             self.soup_dict  = None
             self.updated_items = 0
+            self.page_counter  = 0
             self.thread1_running = threading.Event()
             self.thread2_running = threading.Event()
             
@@ -268,7 +269,7 @@ class LimeTorrentsCrawler(Config):
             pages_queue = Queue.Queue()
             for page in range(self.pages):
                 pages_queue.put(page)
-            page_counter = 0
+            self.page_counter = 0
 
             while not pages_queue.empty():
                 self.thread1_running.set()
@@ -317,10 +318,10 @@ class LimeTorrentsCrawler(Config):
                     else:
                         rospy.logdebug("T1:  1.4) Notifying html parsing with error code [%s]"%str(returned_code))
                         self.condition.notifyAll()
-                        page_counter += 1
+                        self.page_counter += 1
             
             rospy.loginfo("T1:  + FINISHED: Got [%d] pages and finished with [%d] and missed [%d]"%
-                              (page_counter, pages_queue.qsize(), self.missed.qsize()))
+                              (self.page_counter, pages_queue.qsize(), self.missed.qsize()))
 
             self.crawler_finished = True
             
