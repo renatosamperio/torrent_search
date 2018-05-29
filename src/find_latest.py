@@ -457,14 +457,21 @@ class FindLatest():
         except Exception as inst:
             utilities.ParseException(inst)
 
-                super_count += 1
-            elapsed_time = time.time() - start_time
-            rospy.logdebug("  + Collected [%d] records in [%s]"%(counter, str(elapsed_time)))
-                
+    def GetInvoice(self, posted_items):
+        try:
+            self.invoice = {
+                    'database':     self.database,
+                    'collection':   self.collection,
+                    'search_type':  self.search_type,
+                    'result':  {
+                        'posted_items': len(posted_items),
+                    }
+                    
+            }
         except Exception as inst:
             utilities.ParseException(inst)
         finally:
-            return all_changed_items, all_newest_items
+            return self.invoice
 
 if __name__ == '__main__':
     usage = "usage: %prog option1=string option2=bool"
