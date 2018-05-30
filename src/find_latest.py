@@ -381,28 +381,34 @@ class FindLatest():
 
         imdb_items   = []
         try:
-            ## Getting Slack and IMDB clients
-            slack_token         = self.slack_token
-            slack_client        = SlackClient(slack_token)
-            comparator          = Similarity.Similarity()
-            for new_item in newest_items:
+            db_size = self.db_handler.Size()
+            rospy.logdebug("Getting [%s] records from [%s]"%
+                           (str(db_size), self.collection))
+            
+            ## Find all available records
+            query = self.movie_helper.create_query(self.latest_days)
+            #query = mock_query()
+            #pprint.pprint(query)
+            
+            ## Retrieving latest elements
+            records = self.db_handler.Find(query)
+            rospy.loginfo("  + Found [%d] records"%records.count())
+            for record in records:
                 
                 ## Getting torrent data
-                name            = new_item['name']
-                clean_name      = clean_sentence(name)
-                link            = new_item['link']
-                size            = str(new_item['size'])
-                seeds           = list_values('seeds')
-                leeches         = list_values('leeches')
-                magnet, dLink   = look_for_magnet(link)
+                name            = record['name']
+                clean_name      = self.movie_helper.clean_sentence(name, self.list_terms)
+                size            = str(record['size'])
+                seeds           = self.movie_helper.list_values(record, 'seeds')
+                leeches         = self.movie_helper.list_values(record, 'leeches')
                 
                 ## Torrent information
                 torrent_info    = {
                     'torrent_title':    clean_name,
                     'size':             size,
-                    'magnet':           magnet,
-                    'download_link':    dLink,
-                    'torrent_link':     link,
+                    'magnet':           record['magnetic_link'],
+                    'download_link':    record['torrent_file'],
+                    'torrent_link':     record['link'],
                     'seeds': {
                         'mean':         seeds.mean(),
                         'stdev':        seeds.std()
@@ -413,9 +419,10 @@ class FindLatest():
                     }
                 }
                 
-                ## Searching for IMDB info
-                imdb_selected   = get_imdb_best_title(torrent_info, comparator)
-                if len(imdb_selected)<1:
+                ## Getting IMDB data
+                rospy.logdebug("Getting IMDB information for [%s]"%clean_name)
+                items = self.movie_helper.get_imdb_best_title(torrent_info)
+                if len(items)<1:
                     rospy.logdebug("- No IMDB data found for [%s]"%clean_name)
                     continue
                 
@@ -429,23 +436,24 @@ class FindLatest():
 
     def PostMovies(self, imdb_items):
         try:
-            db_size = self.db_handler.Size()
-            rospy.logdebug("  + Getting [%s] records from [%s]"%(str(db_size), self.collection))
-            
-            ## Find all available records
-#             query   = { '$and': [
-#                 { 'seeds.value.4.8': { '$exists': False }}, 
-#                 { 'seeds.value.4.9': { '$exists': True }}, 
-#                 { 'seeds.value.4.10': { '$exists': True }}, 
-#                 { 'seeds.value.4.11': { '$exists': True }}]}
-            
-            query = create_query(self.latest_days)
-            pprint.pprint(query)
-            
-            records = self.db_handler.Find(query)
-            rospy.logdebug("  + Found [%d] records"%records.count())
-            for record in records:
-                pprint.pprint(record)
+            for imdb_selected in imdb_items:
+                ## Prepares slack message with fields and attachment
+                rospy.logdebug('+    Preparing slack message')
+                torrent_info    = imdb_selected['torrent_info']
+                attachments     = []
+                for imdb_item in imdb_selected['imdb_info']:
+                    fields      = self.post_helper.prepare_fields(torrent_info, imdb_item)
+                    attachments = self.post_helper.prepare_attachment(torrent_info, imdb_item, fields=fields)
+    
+                    rospy.logdebug('+    Posting in slack')
+                    response = self.slack_client.PostMessage(
+                        self.slack_channel, "",
+                        username='',
+                        icon_emoji='',
+                        as_user=True,
+                        attachments=attachments
+                    )
+
         except Exception as inst:
             utilities.ParseException(inst)
 
@@ -512,6 +520,6 @@ if __name__ == '__main__':
     args.update({'slack_token':     options.slack_token})
     
     ## Executing task action for finding latest changes
-    taskAction              = FindLatest(**args)
-    changes, newest_items   = taskAction.GetMovies(['seeds'])
+    taskAction  = FindLatest(**args)
+    imdb_items  = taskAction.GetMovies(['seeds'])
     #taskAction.PostNew(newest_items)
