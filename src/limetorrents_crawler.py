@@ -161,6 +161,7 @@ class LimeTorrentsCrawler(Config):
             
             if returned_code != 200:
                 rospy.logwarn("T2:         Returned code [%s] captured page [%s]"% (str(returned_code), link))
+                return magnet
 
             coincidences_found = soup.findAll('div', class_='dltorrent')    
             if len(coincidences_found)<1:
