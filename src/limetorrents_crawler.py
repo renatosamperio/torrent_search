@@ -40,7 +40,6 @@ class LimeTorrentsCrawler(Config):
         """Initialisations."""
         try:
             self.condition      = threading.Condition()
-#             self.complete_cond  = threading.Condition()
             Config.__init__(self)
             ## Initialising class variables
             self.class_name = self.__class__.__name__.lower()
@@ -72,22 +71,13 @@ class LimeTorrentsCrawler(Config):
                 
             self.proxies    = self.get_proxies('limetorrents')
             self.proxy      = None
-            self.index      = 0
-            self.page       = 0
             self.total_fetch_time = 0
-            self.mylist     = []
-            self.masterlist = []
-            self.mylist_crossite = []
-            self.masterlist_crossite = []
-            self.mapper     = []
-            ## self.soup_dict  = {}
-            #self.soup_dict  = Queue.Queue()
+            self.waiting_time = 30
+
             self.missed     = Queue.Queue()
             self.missed_links = Queue.Queue()
             self.soup       = None
             self.headers    = ['NAME', 'INDEX', 'SIZE', 'SE/LE', 'UPLOADED']
-            ## self.key1       = 'magnet:?xt=urn:btih:'
-            ## self.key2       = '&'
             self.key1       = 'http://itorrents.org/torrent/'
             self.key2       = '.torrent?'
             
@@ -296,8 +286,7 @@ class LimeTorrentsCrawler(Config):
                 
                 if str(type(self.soup)) == 'bs4.BeautifulSoup':
                     rospy.logerr("T1:Invalid HTML search type [%s]"%str(type(self.soup)))
-                    waiting_time = 30 
-                    rospy.loginfo("T1:       Waiting for [%d]s:"%waiting_time)
+                    rospy.loginfo("T1:       Waiting for [%d]s:"%self.waiting_time)
                     time.sleep(waiting_time)
                     pages_queue.put(page)
                     continue
@@ -305,12 +294,11 @@ class LimeTorrentsCrawler(Config):
                 if returned_code != 200:
                     rospy.logwarn("T1:Returned code [%s] captured page [%s]"% (str(returned_code), search_url))
                     self.missed.put(search_url)
-                    waiting_time = 30
-                    rospy.loginfo("T1:       Waiting for [%d]s:"%waiting_time)
+                    rospy.loginfo("T1:       Waiting for [%d]s:"%self.waiting_time)
                     with self.condition:
                         rospy.logdebug("T1:       Notifying html parsing with error code [%s]"%str(returned_code))
                         self.condition.notifyAll()
-                    time.sleep(waiting_time)
+                    time.sleep(self.waiting_time)
                     pages_queue.put(page)
                     continue
                     
@@ -329,7 +317,7 @@ class LimeTorrentsCrawler(Config):
                         self.condition.notifyAll()
                         page_counter += 1
             
-            rospy.loginfo("T1:  + Got [%d] pages and finished with [%d] and missing [%d]"%
+            rospy.loginfo("T1:  + FINISHED: Got [%d] pages and finished with [%d] and missed [%d]"%
                               (page_counter, pages_queue.qsize(), self.missed.qsize()))
 
             self.crawler_finished = True
@@ -338,9 +326,8 @@ class LimeTorrentsCrawler(Config):
             ros_node.ParseException(inst)
         finally:
             ## Clearing thread flag
-            print "CRAWLER FINISHED!!!"
             self.thread1_running.clear()
-
+    
     def parse_html(self):
         """
         Parse HTML to get required results.
@@ -367,8 +354,7 @@ class LimeTorrentsCrawler(Config):
                     with self.condition:
                         rospy.logdebug("T2:  < B > Waiting for HTML crawler notification...")
                         self.condition.wait()
-                        rospy.logwarn("T2:  < C > Got notified  and GET_HTML %s" % (state))
-                        #continue
+                        rospy.logdebug("T2:  < C > Got notified  and GET_HTML %s" % (state))
                 
                 ## Acquiring lock for processing queue of retrieved pages
                 with self.lock:
@@ -384,106 +370,37 @@ class LimeTorrentsCrawler(Config):
                 page                = soupKeys[0]
                 rospy.logdebug("T2:  2.2) Getting page [%d]"%(page+1))
                 soup                = soupDict[page]
-                
+
                 ## Verifying soup is valid
                 if not isinstance(soup, bs4.BeautifulSoup):
                     rospy.logerr("T2:Invalid HTML search item")
-                    
+
                 ## Looking for table components
                 content             = soup.find('table', class_='table2')
                 rospy.logdebug("T2:  2.3) Looking for torrent data in page [%d]"%(page+1))
                 if content is None:
                     rospy.logerr("T2:Invalid parsed content")
                     return
-                
+
                 results             = content.findAll('tr')
                 for result in results[1:]:
                     ## Increasing links processed counter
                     link_parsed += 1
-                    
+
+                    ## Getting source data
+                    rospy.logdebug("    "+("  --"*5))
+                    rospy.logdebug("T2:  2.4) Updating parsed web element")
                     data            = result.findAll('td')
-                    # try block is limetorrents-specific. Means only limetorrents requires this.
-                    tag_found       = data[0].findAll('a')
-                    link_index      = len(tag_found)-1
-                    name            = tag_found[link_index].string
-                    link            = tag_found[link_index]['href']
-                    link            = (self.proxy+link).encode('ascii', 'ignore').decode('ascii')
-                    date            = data[1].string
-                    date            = date.split('-')[0]
-                    size            = data[2].string
-                    seeds           = data[3].string.replace(',', '')
-                    leeches         = data[4].string.replace(',', '')
-                    seeds_color     = self.colorify("green", seeds)
-                    leeches_color   = self.colorify("red", leeches)
                     
-                    self.index      += 1
-                    self.mapper.insert(self.index, (name, link, self.class_name))
-                    self.mylist     = [name, "--" +
-                                    str(self.index) + "--", size, seeds_color+'/'+
-                                    leeches_color, date]
-                    self.masterlist.append(self.mylist)
-                    self.mylist_crossite = [name, self.index, size, seeds+'/'+leeches, date]
-                    self.masterlist_crossite.append(self.mylist_crossite)
-                    
-                    element         = {
-                        'name': name,
-                        'date': date,
-                        'size': size,
-                        'seeds': seeds,
-                        'leeches': leeches,
-                        'link': link,
-                        'page': page+1
-                    }
+                    ## This method collects data from opened URL
+                    ##     and updates content accordingly
+                    element, dbItem = self.UpdateElement(data, pages_parsed)
+                    if element is None:
+                        rospy.logdebug("T2:  Element not updated")
+                        return
 
-                    ## Getting hash
-                    torrent_file    = data[0].findAll('a')[0]['href']
-                    start_index     = torrent_file.find(self.key1)+len(self.key1)
-                    end_index       = torrent_file.find(self.key2)
-                    hash            = torrent_file[start_index:end_index]
-                    element.update({'hash': hash})
-                    element.update({'torrent_file': torrent_file})
-                    
-                    ## Getting available images
-                    images          = data[0].findAll('img')
-                    qualifiers      = []
-                    if len(images) > 0:
-                        for image in images:
-                            qualifiers.append(image['title'])
-                        element.update({'qualifiers': qualifiers})
-
-                    ## Getting magnet link
-                    if self.with_magnet:
-                        rospy.logdebug("T2:  2.3.1) Getting magnet link")
-                        magnetic_link = self.get_magnet_ext(link)
-                        if magnetic_link is None:
-                            rospy.logwarn('T2:  No available magnet for [%s] with link [%s]'%
-                                          (hash, str(link)))
-                            
-                            ## Adding element to missing links list
-                            self.missed_links.put(element)
-                            rospy.logwarn('T2:  2.3.2) Added [%s] to missing links, size [%s]'%
-                                          (hash, str(self.missed_links.qsize())))
-                            waiting_time = 30 
-                            rospy.loginfo("T2:  2.3.3) Waiting for [%d]s:"%waiting_time)
-                            time.sleep(waiting_time)
-
-                            magnetic_link = ''
-                        element.update({'magnetic_link': magnetic_link})
-
-                    ## Inserting in database
-                    if self.db_handler is not None:
-                        rospy.logdebug("T2:  2.4) [%d.%d] Appending in database [%s]"%
-                                       (pages_parsed+1, (link_parsed+1), element['hash']))
-                        result = self.Update_TimeSeries_Day(element, 
-                                                    'hash',         ## This is the item key, it should be unique!
-                                                    ['seeds', 'leeches'],  ## These items are defined in a time series
-                                                    ) 
-                        if not result:
-                            rospy.logerr("T2:DB insertion failed")
-                    
                 ## Incremented torrents got magentic link
                 pages_parsed += 1
-
                 rospy.logdebug("T2: Remaining torrent pages [%s]"%(self.soup_dict.qsize()))
                 if self.db_handler is not None:
                     rospy.logdebug("T2:  - Total records in DB: [%d]"%self.db_handler.Size())
@@ -494,6 +411,7 @@ class LimeTorrentsCrawler(Config):
                 rospy.logwarn("T2:  + Found [%s] elements with missing link"%self.missed_links.qsize() )
                 while self.missed_links.qsize()>0:
                     element         = self.missed_links.get()
+                    link            = element['link']
                     rospy.logdebug("T2:  + Re-opening element [%s]"%element['hash'])
                     magnetic_link   = self.get_magnet_ext(link)
                     if magnetic_link is None:
@@ -501,10 +419,9 @@ class LimeTorrentsCrawler(Config):
                     else:
                         element.update({'magnetic_link': magnetic_link})
                         rospy.logdebug("T2:  + Appending in database [%s]"%element['hash'])
-                        result = self.Update_TimeSeries_Day(element, 
-                                        'hash',         ## This is the item key, it should be unique!
-                                        ['seeds', 'leeches'],  ## These items are defined in a time series
-                                        ) 
+                        
+                        ## BUG: This method updates only attributes leeches and seeds 
+                        result = self.UpdateTimeSeries(element, dbItem, ['seeds', 'leeches'])
                         if not result:
                             rospy.logerr("T2:  + DB insertion failed")
                 
@@ -544,27 +461,23 @@ class LimeTorrentsCrawler(Config):
             
             while not posts_queue.empty():
                 post = posts_queue.get()
-                ##pprint.pprint(post)
                 search_url  = post['link'].encode("utf-8")
-#                     print "===> search_url:", search_url
                 rospy.logdebug("T3:      3.2.1) Looking into URL")
                 
                 soup, time_, returned_code = self.http_request_timed(search_url)
         
                 if str(type(soup)) == 'bs4.BeautifulSoup':
                     rospy.logwarn("T3: Invalid HTML search type [%s]"%str(type(soup)))
-                    waiting_time = 30 
-                    rospy.loginfo("T3:       Waiting for [%d]s:"%waiting_time)
-                    time.sleep(waiting_time)
+                    rospy.loginfo("T3:       Waiting for [%d]s:"%self.waiting_time)
+                    time.sleep(self.waiting_time)
                     posts_queue.put(post)
                     continue
                 
                 if returned_code != 200:
                     rospy.logwarn("T3: Returned code [%s] captured page [%s]"% (str(returned_code), search_url))
                     self.missed.put(search_url)
-                    waiting_time = 30 
-                    rospy.loginfo("T3:       Waiting for [%d]s:"%waiting_time)
-                    time.sleep(waiting_time)
+                    rospy.loginfo("T3:       Waiting for [%d]s:"%self.waiting_time)
+                    time.sleep(self.waiting_time)
                     posts_queue.put(post)
                     continue
                     
@@ -620,54 +533,25 @@ class LimeTorrentsCrawler(Config):
             ## Generating one shot threads
         except Exception as inst:
           ros_node.ParseException(inst)
-        
-    def Run(self):
-        '''
-        Looks for all browse movies and parses HTML in two threads. 
-        Then, updates any non feature torrent in DB 
-        '''
-        try:
-            rospy.logdebug("Obtaining proxies...")
-            proxy_ok = self.check_proxy()
-            if proxy_ok:
-                rospy.logdebug("Preparing threads")
-                condition = threading.Condition()
-                html_crawler = threading.Thread(
-                    name='html_crawler', 
-                    target=self.get_html, 
-                    args=(condition,))
-                html_parser  = threading.Thread(
-                    name='html_parser',  
-                    target=self.parse_html, 
-                    args=(condition,))
-                
-                html_parser.start()
-                html_crawler.start()
-                
-                html_crawler.join()
-                html_parser.join()
-                
-                crawler_db  = threading.Thread(
-                    name='crawler_db',  
-                    target=self.complete_db, 
-                    args=(condition,))
-                crawler_db.start()
-                crawler_db.join()
 
-        except Exception as inst:
-          ros_node.ParseException(inst)
-
-    def UpdateBestSeriesValue(self, db_post, web_element, item_index, items_id):
+    def UpdateBestSeriesValue(self, db_post, web_element, items_id):
         '''
         Comparator for time series update to check if for today already exists a value. 
         Could possible be if torrent hash is repeated in the website. 
         
         returns True if value has been updated. Otherwise, DB update failed
         '''
-        result      = True
+        
+        result          = False
         try:
-            postKeys = db_post.keys()
+            hash        = db_post['hash']
+            postKeys    = db_post.keys()
+            
+            ## Look for each time series item
             for key in items_id:
+                
+                ## Look for each time series element
+                ##    of existing DB element
                 if key in postKeys:
                     datetime_now        = datetime.datetime.utcnow()
                     month               = str(datetime_now.month)
@@ -681,40 +565,36 @@ class LimeTorrentsCrawler(Config):
                     ## Checking if day exists
                     day                 = str(datetime_now.day)
                     day_exist           = day in db_post[key]['value'][month].keys()
-                     
-                    ## If day already exists check if it is better the one given 
-                    ## right now by the webiste
                     
-                    condition           = { item_index : web_element[item_index] }
-                    set_key             = key+".value."+str(datetime_now.month)+"."+str(datetime_now.day)
-                    subs_item_id        = {set_key: web_element[key] }
+                    ## If is value found in the website is bigger, use this one
+                    ## otherwise let the one existing in the database
                     if day_exist:
-                        ## If is value found in the website is bigger, use this one
-                        ## otherwise let the one existing in the database
                         todays_db       = db_post[key]['value'][month][day]
                         todays_website  = web_element[key]
                         isTodayBetter   = todays_db < todays_website
                         
                         ## TODO: We should know the page of both items
-                        #print "=== [",datetime_now.month, "/", datetime_now.day,"], todays_db >= todays_website:", todays_db, '>=', todays_website
                         isTodayWorse    = todays_db >= todays_website
                         if isTodayWorse:
                             rospy.logdebug("T2:           Existing value for [%s] similar or better", key)
                         
                         # Updating condition and substitute values
                         elif isTodayBetter:
-                            ## result = True
-                            result      = self.db_handler.Update(condition, subs_item_id)
-                            rospy.logdebug("T2:           Updated [%s] series item with hash [%s] in collection [%s]"% 
-                                      (key, web_element[item_index], self.db_handler.coll_name))
+                            rospy.logdebug("T2:           Updating [%s] series item with hash [%s] in collection [%s]"% 
+                                      (key, hash, self.db_handler.coll_name))
                         
+                     
+                    ## If day already exists check if it is better the one given 
+                    ## right now by the website
+                    set_key             = key+".value."+str(datetime_now.month)+"."+str(datetime_now.day)
+                    subs_item_id        = {set_key: web_element[key] }
+                    
                     ## if day is missing, add it!
-                    else:
-                        ## result = True
-                        result          = self.db_handler.Update(condition, subs_item_id)
-                        rospy.logdebug("T2:           Added [%s] series item for [%s/%s] with hash [%s] in collection [%s]"% 
-                                  (key, str(datetime_now.month), str(datetime_now.day), web_element[item_index], self.db_handler.coll_name))
-                        
+                    condition           = { 'hash' : hash }
+                    result              = self.db_handler.Update(condition, subs_item_id)
+                    rospy.logdebug("T2:           Added [%s] series item for [%s/%s] with hash [%s] in collection [%s]"% 
+                              (key, str(datetime_now.month), str(datetime_now.day), hash, self.db_handler.coll_name))
+
         except Exception as inst:
             ros_node.ParseException(inst)
         finally:
@@ -733,19 +613,16 @@ class LimeTorrentsCrawler(Config):
             postKeys            = db_post.keys()
             postKeysCounter     = Counter(postKeys)
             elementKeysCounter  = Counter(elementKeys)
-            extra_in_db         = (postKeysCounter - elementKeysCounter).keys()
             missed_in_db        = (elementKeysCounter - postKeysCounter).keys()
            
-            for key in extra_in_db:
-                if key != '_id':
-                    rospy.logdebug('T2:  -     TODO: Remove item [%s] from DB', key)
+#             extra_in_db         = (postKeysCounter - elementKeysCounter).keys()
+#             for key in extra_in_db:
+#                 if key != '_id':
+#                     rospy.logdebug('T2:  -     TODO: Remove item [%s] from DB', key)
             
             if len(missed_in_db) > 0:
                 for key in missed_in_db:
                     rospy.logdebug('T2: -     Updated item [%s] from DB', key)
-#                     print "===>_id: ", db_post["_id"]
-#                     print "===>key:", key 
-#                     print "===>web_element:", web_element[key] 
                     result     = self.db_handler.Update(
                                     condition={"_id": db_post["_id"]}, 
                                     substitute={key: web_element[key]}, 
@@ -757,26 +634,168 @@ class LimeTorrentsCrawler(Config):
         finally:
             return result
     
-    def Update_TimeSeries_Day(self, item, item_index, items_id):
+    def GetWebData(self, data, page):
+        element = None
+        try:
+            ## Getting hash
+            torrent_file    = data[0].findAll('a')[0]['href']
+            start_index     = torrent_file.find(self.key1)+len(self.key1)
+            end_index       = torrent_file.find(self.key2)
+            hash            = torrent_file[start_index:end_index]
+            rospy.logdebug("T2:    2.4.1) Got hash [%s]"%(hash))
+            
+            # try block is limetorrents-specific. Means only limetorrents requires this.
+            tag_found       = data[0].findAll('a')
+            print "===> tag_found:", tag_found
+            print "===> tag_found.len:", len(tag_found)
+            link_index      = len(tag_found)-1
+            name            = tag_found[link_index].string
+            link            = tag_found[link_index]['href']
+            link            = (self.proxy+link).encode('ascii', 'ignore').decode('ascii')
+            date            = data[1].string
+            date            = date.split('-')[0]
+            size            = data[2].string
+            seeds           = data[3].string.replace(',', '')
+            leeches         = data[4].string.replace(',', '')
+            rospy.logdebug("T2:    2.4.2) Parsed element data for [%s]"%str(hash))
+            
+            element         = {
+                'name':         name,
+                'date':         date,
+                'size':         size,
+                'seeds':        seeds,
+                'leeches':      leeches,
+                'link':         link,
+                'page':         page+1,
+                'hash':         hash,
+                'torrent_file': torrent_file
+            }
+
+            ## Getting available images
+            images          = data[0].findAll('img')
+            qualifiers      = []
+            if len(images) > 0:
+                for image in images:
+                    qualifiers.append(image['title'])
+                element.update({'qualifiers': qualifiers})
+        except Exception as inst:
+          ros_node.ParseException(inst)
+        finally:
+            return element
+
+    def UpdateElement(self, data, page):
+        element = None
+        try:
+            tsItems         = ['seeds', 'leeches']
+            element         = self.GetWebData(data, page)
+            if element is None:
+                rospy.logdebug("T2:    2.4.3) Built invalid element")
+                return element
+            
+            ## Looking existing record
+            hash            = element['hash']
+            rospy.logdebug("T2  2.5) Looking for existing record of [%s]"%hash)
+            posts           = self.db_handler.Find({'hash': hash })
+            postsSize       = posts.count()
+            if postsSize < 1:
+                rospy.logwarn("T2:    2.5.1) Element [%s] did not exist"%(hash))
+                
+                ## Update magnet
+                element     = self.RetrieveMagnet(element)
+                dbItem      = None
+            else:
+                if postsSize > 1:
+                    rospy.logwarn("T2:    2.5.1) Element [%s] has multiple instances"%(hash))
+                else:
+                    rospy.logdebug("T2:    2.5.1) Element [%s] found"%(hash))
+            
+                ## Collecting existing post in DB
+                dbItem      = posts[0]
+                
+                ## Check if DB element has a magnetic link
+                if 'magnetic_link' not in dbItem.keys() or dbItem['magnetic_link'] == None:
+                    rospy.logdebug("T2:    2.5.2) Getting magnet link")
+                    element = self.RetrieveMagnet(element)
+                else:
+                    rospy.logdebug("T2:    2.5.2) DB record has magnetic link")
+                    
+                ## Checking if current element differs from DB record
+                dbKeys      = dbItem.keys()
+                elemKeys    = element.keys()
+                hasChanged  = False
+                for ekey in elemKeys:
+                    ## If the element key does not exists in DB record
+                    ##    then log the problem
+                    updateDb            = False
+                    if ekey not in dbKeys:
+                        rospy.logwarn("T2:     2.5.3) Key [%s] do not exists in DB elements"%ekey)
+                        updateDb        = True
+
+                    ## If the element key is different to current DB 
+                    ##    record, then use the element data
+                    elif ekey not in tsItems and element[ekey] != dbItem[ekey]:
+                        updateDb        = True
+                    
+                    if updateDb:
+                        hasChanged      = True
+                        dbItem[ekey]    = element[ekey]
+                        updated_items   = {ekey: element[ekey] }
+                        query_condition = { 'hash' : hash }
+                        
+                        rospy.logdebug("T2:       Updating key [%s] in DB elements"%ekey)
+                        result          = self.db_handler.Update(query_condition, updated_items)
+                
+                if not hasChanged:
+                    rospy.logdebug("T2:       Element [%s] has not been updated"%hash)
+                
+                ## Updating time series section
+                result = self.UpdateTimeSeries(element, dbItem, tsItems)
+            return element, dbItem
+                        
+        except Exception as inst:
+          ros_node.ParseException(inst)
+
+    def RetrieveMagnet(self, element):
+        try:
+            ## Getting magnet link
+            hash            = element['hash']
+            link            = element['link']
+            magnetic_link   = self.get_magnet_ext(link)
+            if magnetic_link is None:
+                rospy.logwarn('T2:+  No available magnet for [%s] with link [%s]'%
+                              (hash, str(link)))
+                
+                ## Adding element to missing links list
+                self.missed_links.put(element)
+                rospy.logwarn('T2:+  Added [%s] to missing links, size [%s]'%
+                              (hash, str(self.missed_links.qsize())))
+                rospy.loginfo("T2:+  Waiting for [%d]s:"%self.waiting_time)
+                time.sleep(self.waiting_time)
+
+                magnetic_link = ''
+            rospy.logdebug("T2:+  Updating magnet link for [%s]"%(hash))
+            element.update({'magnetic_link': magnetic_link})        
+        except Exception as inst:
+          ros_node.ParseException(inst)
+        finally:
+            return element
+
+    def UpdateTimeSeries(self, element, dbItem, items_id):
         '''
         Generate a time series model 
         https://www.mongodb.com/blog/post/schema-design-for-time-series-data-in-mongodb
         '''
         result = False
         try:
-            ## Check if given item already exists, otherwise
-            ## insert new time series model for each item ID
-            keyItem                 = item[item_index]
-            condition               = {item_index: keyItem}
-            posts                   = self.db_handler.Find(condition)
-            datetime_now            = datetime.datetime.utcnow()
-            postsSize               = posts.count()
+            ## Get current date
+            datetime_now    = datetime.datetime.utcnow()
+            hash            = element['hash']
+            rospy.logdebug("T2:    2.5.4) Updating time series section for [%s]"%hash)
             
-            ## We can receive more than one time series item
-            ## to update per call in the same item
-            #TODO: Do a more efficient update/insert for bulk items
-            if postsSize < 1:
-                ## Prepare time series model for time series
+            ## If element does not exists in DB,
+            ##    Generate a new time series item
+            if dbItem is None:
+                ## Create time series model for time series
                 def get_day_timeseries_model(value, datetime_now):
                     return { 
                         "timestamp_day": datetime_now.year,
@@ -786,35 +805,27 @@ class LimeTorrentsCrawler(Config):
                             }
                         }
                     };
+                
+                ## Generate time series schema for each
+                ##    required key item (seeds, leeches)
+                
+                rospy.logdebug('T2:    2.5.4.1) Generating time series schema for [%s]', hash)
                 for key_item in items_id:
-                    item[key_item]   = get_day_timeseries_model(item[key_item], datetime_now)
+                    element[key_item]   = get_day_timeseries_model(element[key_item], datetime_now)
+                    
                 ## Inserting time series model
-                post_id             = self.db_handler.Insert(item)
+                post_id             = self.db_handler.Insert(element)
                 rospy.logdebug("T2:  -     Inserted time series item with hash [%s] in collection [%s]"% 
-                                  (keyItem, self.db_handler.coll_name))
+                                  (hash, self.db_handler.coll_name))
                 result = post_id is not None
             else:
-                if postsSize>1:
-                    rospy.logdebug('   Warning found [%d] items for [%s]'
-                                      %(postsSize, keyItem))
-                for post in posts:  ## it should be only 1 post!
-                    ## 1) Check if there are missing or extra keys
-                    updated_missing = self.AddMissingKeys(copy.deepcopy(post), item)
-                    if updated_missing:
-                        rospy.logdebug('T2:    2.4.1) Added item  [%s] into DB ', keyItem)
-                    else:
-                        rospy.logdebug('T2:    2.4.2) DB Updated failed or no added key in item [%s]', keyItem)
-                    
-                    ## 2) Check if items for HASH already exists
-                    ts_updated      = self.UpdateBestSeriesValue(post, 
-                                                                 item, 
-                                                                 item_index, 
-                                                                 items_id)
-                    if ts_updated:
-                        rospy.logdebug('T2:    2.4.3) Time series updated for [%s]', keyItem)
-                    else:
-                        rospy.logdebug('T2:    2.4.4) DB Updated failed or time series not updated for [%s]', keyItem)
-                    result              = updated_missing and ts_updated
+                ## 1) Check if items for HASH already exists
+                ts_updated = self.UpdateBestSeriesValue(dbItem, element, items_id)
+                if ts_updated:
+                    rospy.logdebug('T2:    2.5.4.1) Time series updated for [%s]', hash)
+                else:
+                    rospy.logerr('T2:    2.5.4.1) DB Updated failed or time series not updated for [%s]', hash)
+                result = ts_updated
                     
         except Exception as inst:
             result = False
