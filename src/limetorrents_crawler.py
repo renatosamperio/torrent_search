@@ -651,8 +651,8 @@ class LimeTorrentsCrawler(Config):
             
             # try block is limetorrents-specific. Means only limetorrents requires this.
             tag_found       = data[0].findAll('a')
-            print "===> tag_found:", tag_found
-            print "===> tag_found.len:", len(tag_found)
+#             print "===> tag_found:", tag_found
+#             print "===> tag_found.len:", len(tag_found)
             link_index      = len(tag_found)-1
             name            = tag_found[link_index].string
             link            = tag_found[link_index]['href']
@@ -699,11 +699,11 @@ class LimeTorrentsCrawler(Config):
             
             ## Looking existing record
             hash            = element['hash']
-            rospy.logdebug("T2  2.5) Looking for existing record of [%s]"%hash)
+            rospy.logdebug("T2:  2.5) Looking for existing record of [%s]"%hash)
             posts           = self.db_handler.Find({'hash': hash })
             postsSize       = posts.count()
             if postsSize < 1:
-                rospy.logwarn("T2:    2.5.1) Element [%s] did not exist"%(hash))
+                rospy.logdebug("T2:    2.5.1) Element [%s] did not exist"%(hash))
                 
                 ## Update magnet
                 element     = self.RetrieveMagnet(element)
@@ -755,6 +755,7 @@ class LimeTorrentsCrawler(Config):
                 
                 ## Updating time series section
                 result = self.UpdateTimeSeries(element, dbItem, tsItems)
+                
             return element, dbItem
                         
         except Exception as inst:
@@ -831,7 +832,7 @@ class LimeTorrentsCrawler(Config):
                 else:
                     rospy.logerr('T2:    2.5.4.1) DB Updated failed or time series not updated for [%s]', hash)
                 result = ts_updated
-                    
+            
         except Exception as inst:
             result = False
             ros_node.ParseException(inst)
