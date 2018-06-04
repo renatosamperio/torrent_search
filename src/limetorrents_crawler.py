@@ -50,6 +50,7 @@ class LimeTorrentsCrawler(Config):
             self.pages      = None
             self.db_handler = None
             self.soup_dict  = None
+            self.updated_items = 0
             self.thread1_running = threading.Event()
             self.thread2_running = threading.Event()
             
@@ -399,6 +400,9 @@ class LimeTorrentsCrawler(Config):
                     if element is None:
                         rospy.logdebug("T2:  Element not updated")
                         return
+                    
+                    self.updated_items += 1
+                    rospy.loginfo('T2:  2.6 [%s] items updated'%str(self.updated_items))
 
                 ## Incremented torrents got magentic link
                 pages_parsed += 1
