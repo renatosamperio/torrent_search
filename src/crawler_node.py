@@ -79,9 +79,10 @@ class CrawlerNode(ros_node.RosNode):
 
     def Init(self):
         try:
+            ## TODO: If parameters are not given do not start
             ## Getting environment variables
             self.page_limit = self.mapped_params['/torrent_crawler/page_limit'].param_value
-            rospy.logdebug('+ Got page_limit of [%d]'%self.page_limit)
+            rospy.logdebug('+ Got page_limit of [%s]'%str(self.page_limit))
             self.search_type = self.mapped_params['/torrent_crawler/search_type'].param_value
             rospy.logdebug('+ Got search_type of [%s]'%self.search_type)
             self.with_magnet = self.mapped_params['/torrent_crawler/with_magnet'].param_value
