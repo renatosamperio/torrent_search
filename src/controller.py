@@ -168,7 +168,10 @@ class TorrentsController(LimeTorrentsCrawler):
 
     def collect_data(self, **kwargs):
         try:
-            ## Setting class parameters everytime
+            ## Clearing item counter
+            self.updated_items = 0
+            
+            ## Setting class parameters every time
             ##    a message comes
             self.SetParameters(**kwargs)
             
@@ -178,11 +181,11 @@ class TorrentsController(LimeTorrentsCrawler):
             kwargs.update({'soup_dict': self.soup_dict})
             
             ## Created lime torrents crawler
-            rospy.logdebug("=> Created lime torrent craler")
+            rospy.logdebug("=> Created lime torrent crawler")
             self.crawler = LimeTorrentsCrawler(**kwargs)
             
             with self.run_crawler:
-                rospy.logdebug('  + Setting craler')
+                rospy.logdebug('  + Setting crawler')
                 self.run_crawler.notifyAll()
             
             with self.run_parser:
