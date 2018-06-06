@@ -42,7 +42,7 @@ class TorrentsController(LimeTorrentsCrawler):
             self.parser_finished    = False 
             self.soup_dict          = Queue.Queue()
             
-            self.SetParameteres(**kwargs)
+            self.SetParameters(**kwargs)
             
             ## Initialising processes for crawing and parsing 
             self.Init()    
@@ -75,7 +75,7 @@ class TorrentsController(LimeTorrentsCrawler):
         finally:
             return self.db_handler
 
-    def SetParameteres(self, **kwargs):
+    def SetParameters(self, **kwargs):
         try:  
             for key, value in kwargs.iteritems():
                 if "title" == key:
@@ -170,7 +170,7 @@ class TorrentsController(LimeTorrentsCrawler):
         try:
             ## Setting class parameters everytime
             ##    a message comes
-            self.SetParameteres(**kwargs)
+            self.SetParameters(**kwargs)
             
             ## Connecting to DB
             handler = self.ConnectDB()
