@@ -1,5 +1,5 @@
 <launch>
-  <rosparam command="load" file="/home/renato/workspace/projects/home_services/cfg/hs_params.yaml" />
+  <rosparam command="load" file="/opt/home_services/src/home_services/cfg/hs_params.yaml" />
   <node name="torrent_crawler" pkg="torrent_search" type="crawler_node.py" args="--debug"/>
 
 <!-- Comment -->
