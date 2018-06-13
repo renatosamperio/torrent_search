@@ -74,13 +74,13 @@ class FinderNode(ros_node.RosNode):
             ## TODO: If parameters are not given do not start
             ## Getting environment variables
             self.list_term = self.mapped_params['/torrent_finder/list_term'].param_value
-            rospy.logdebug('+ Got page_limit of [%s]'%str(self.list_term))
+            rospy.logdebug('+ Got list_term of [%s]'%str(self.list_term))
             self.slack_token = self.mapped_params['/torrent_finder/slack_token'].param_value
-            rospy.logdebug('+ Got page_limit of [%s]'%str(self.slack_token))
+            rospy.logdebug('+ Got slack_token of [%s]'%str(self.slack_token))
             self.slack_channel = self.mapped_params['/torrent_finder/slack_channel'].param_value
-            rospy.logdebug('+ Got page_limit of [%s]'%str(self.slack_channel))
+            rospy.logdebug('+ Got slack_channel of [%s]'%str(self.slack_channel))
             self.latest_days = self.mapped_params['/torrent_finder/latest_days'].param_value
-            rospy.logdebug('+ Got page_limit of [%s]'%str(self.latest_days))
+            rospy.logdebug('+ Got latest_days of [%s]'%str(self.latest_days))
             
             ## Starting publisher thread
             rospy.loginfo('Starting latest torrents service')
@@ -110,7 +110,7 @@ class FinderNode(ros_node.RosNode):
                     }
 
                 if self.search_type == 'find_latest':
-                    rospy.loginfo('+ Getting latest finder')
+                    rospy.loginfo('+ Getting latest records')
                     self.controller = FindLatest(**args)
                     newest_items = self.controller.GetMovies()
                 
