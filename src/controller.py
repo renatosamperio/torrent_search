@@ -20,14 +20,14 @@ from collections import Counter
 from torrench.utilities.Config import Config
 from limetorrents_crawler import LimeTorrentsCrawler
 
-class TorrentsController(LimeTorrentsCrawler):
+class TorrentsController:#(LimeTorrentsCrawler):
 
     def __init__(self, **kwargs):
         """Initialisations."""
         try:
             self.run_crawler    = threading.Condition()
             self.run_parser     = threading.Condition()
-            self.run_complete_db= threading.Condition()
+            self.run_post= threading.Condition()
             
             self.db_handler         = None
             self.title              = None
