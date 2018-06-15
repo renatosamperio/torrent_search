@@ -108,9 +108,6 @@ class TorrentsController(LimeTorrentsCrawler):
                 self.crawler.get_html()
                 self.crawler_finished = True
                 
-                ## Call complete DB process
-                rospy.logdebug('T1: Calling DB completion')
-                self.run_complete()
 
         except Exception as inst:
             ros_node.ParseException(inst)
@@ -146,8 +143,7 @@ class TorrentsController(LimeTorrentsCrawler):
                 rate_sleep.sleep()
                 self.parser_finished    = False
                 self.crawler_finished   = False
-                
-                rospy.logdebug('T3: Calling DB completion')
+
         except Exception as inst:
           ros_node.ParseException(inst)
 
@@ -169,7 +165,6 @@ class TorrentsController(LimeTorrentsCrawler):
     def collect_data(self, **kwargs):
         try:
             ## Clearing item counter
-            self.updated_items = 0
             
             ## Setting class parameters every time
             ##    a message comes
