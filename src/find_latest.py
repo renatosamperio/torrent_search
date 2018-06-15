@@ -315,23 +315,33 @@ class FindLatest():
             self.slack_channel    = None
             self.slack_token      = None
             self.latest_days      = None
+            self.list_terms       = None
+            self.movie_helper     = MovieFinder()
+            self.post_helper      = PostHelper()
+            self.slack_client     = None
+            self.invoice          = None
+            self.search_type      = None
             
             # Generating instance of strategy  
             for key, value in kwargs.iteritems():
                 if "database" == key:
                     self.database = value
+                elif "search_type" == key:
+                    self.search_type = value
                 elif "collection" == key:
                     self.collection = value
                 elif "latest_days" == key:
                     self.latest_days = value
                 elif "slack_token" == key:
                     self.slack_token = value
+                    self.slack_client = slack_client.SlackHandler(self.slack_token)
+                    rospy.logdebug("  +   Setting up slack client")
                 elif "slack_channel" == key:
                     self.slack_channel = value
                     rospy.logdebug("  +   Setting up channel [%s]"%self.slack_channel)
                 elif "list_term" == key:
                     if value is not None:
-                        self.with_changes = self.LoadTerms(value)
+                        self.list_terms = self.LoadTerms(value)
             
             self.Init()
         except Exception as inst:
@@ -339,11 +349,12 @@ class FindLatest():
     
     def Init(self):
         try:
-            rospy.logdebug("  + Generating database [%s] in [%s] collections"% 
+            rospy.logdebug("  + Connecting to [%s] with [%s] collections"% 
                                 (self.database, self.collection))
             self.db_handler = MongoAccess()
             self.db_handler.connect(self.database, self.collection)
             
+            rospy.logdebug('  + Registering invoice')
         except Exception as inst:
             utilities.ParseException(inst)
 
