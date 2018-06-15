@@ -189,3 +189,22 @@ class TorrentsController(LimeTorrentsCrawler):
             
         except Exception as inst:
           ros_node.ParseException(inst)
+
+    def GetInvoice(self):
+        invoice = None
+        try:
+            rospy.logdebug('  + Preparing service invoice')
+            invoice = {
+                    'database':          self.database,
+                    'collection':        self.collection,
+                    'search_type':       self.search_type,
+                    'result':  {
+                        'updated_items': self.crawler.updated_items,
+                        'counted_pages': self.crawler.page_counter
+                    }
+                    
+            }
+        except Exception as inst:
+            ros_node.ParseException(inst)
+        finally:
+            return invoice
