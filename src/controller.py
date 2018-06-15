@@ -134,12 +134,12 @@ class TorrentsController(LimeTorrentsCrawler):
         try:
             rate_sleep = rospy.Rate(1.0/5.0)
             while not rospy.is_shutdown():
-                with self.run_complete_db:
+                with self.run_post:
                     rospy.logdebug("T3: Waiting for command to complete DB...")
-                    self.run_complete_db.wait()
+                    self.run_post.wait()
 
                 ## Starting parser
-                rospy.logdebug('T3: Starting DB completion')
+                rospy.logdebug('T3: Starting post execution routine')
                 rate_sleep.sleep()
                 self.parser_finished    = False
                 self.crawler_finished   = False
