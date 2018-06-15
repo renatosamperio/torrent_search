@@ -150,13 +150,13 @@ class TorrentsController(LimeTorrentsCrawler):
     def run_complete(self):
         try:
             if self.crawler_finished and self.parser_finished:
-                rospy.logdebug('  + Time to start DB completion.. ')
-                with self.run_complete_db:
-                    self.run_complete_db.notifyAll()
+                rospy.logdebug('  + Time to start post execution routine.. ')
+                with self.run_post:
+                    self.run_post.notifyAll()
             else:
                 crawler_result = 'is finished' if self.crawler_finished else 'has NOT finished'
                 parser_result = 'is finished' if self.parser_finished else 'has NOT finished'
-                rospy.logdebug('  + Not started DB completion because crawler %s and parser %s'%
+                rospy.logdebug('  + Not started post execution routine because crawler %s and parser %s'%
                                (crawler_result, parser_result))
 
         except Exception as inst:
