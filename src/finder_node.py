@@ -116,7 +116,27 @@ class FinderNode(ros_node.RosNode):
                 
         except Exception as inst:
               ros_node.ParseException(inst)
-              
+
+    def PublishInvoice(self, invoice):
+        try:
+            if invoice is None:
+                rospy.logwarn('Invalid invoice')
+                return
+                
+            ## Preparing invoice message
+            msg = torrentInvoice()
+            msg.database    = invoice['database']
+            msg.collection  = invoice['collection']
+            msg.service_type= invoice['search_type']
+            msg.node_type   = 'finder_node'
+            msg.result      = json.dumps(invoice['result'], 
+                                         sort_keys=True,
+                                         separators=(',', ': '))
+            msg.header.stamp= rospy.Time.now()
+            self.Publish('service_result', msg)
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
 if __name__ == '__main__':
     usage       = "usage: %prog option1=string option2=bool"
     parser      = OptionParser(usage=usage)
@@ -145,7 +165,7 @@ if __name__ == '__main__':
         ('~search_for_latest',  torrentQuery)
     ]
     pub_topics     = [
-        #('~topic2',  Bool)
+        ('service_result',     torrentInvoice)
     ]
     system_params  = [
         '/torrent_finder/list_term',
