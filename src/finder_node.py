@@ -16,7 +16,7 @@ from find_latest import FindLatest
 from std_msgs.msg import Bool
 from std_msgs.msg import String
 from torrent_search.msg import torrentQuery
-
+from torrent_search.msg import torrentInvoice
 
 class FinderNode(ros_node.RosNode):
     def __init__(self, **kwargs):
@@ -97,6 +97,10 @@ class FinderNode(ros_node.RosNode):
                     rospy.logdebug('+ Waiting for next command')
                     self.condition.wait()
                 
+                ## Getting environment variables
+                self.latest_days = self.GetParam('/torrent_finder/latest_days')
+                rospy.logdebug('+ Search for last [%s] days'%str(self.latest_days))
+                
                 ## Collecting connection data
                 args = {
                     'database':     self.database,
@@ -112,8 +116,16 @@ class FinderNode(ros_node.RosNode):
                 if self.search_type == 'find_latest':
                     rospy.loginfo('+ Getting latest records')
                     self.controller = FindLatest(**args)
-                    newest_items = self.controller.GetMovies()
+                    imdb_items = self.controller.GetMovies()
+                    
+                    ## Post into slack
+                    rospy.loginfo('+ Posting latest records')
+                    self.controller.PostMovies(imdb_items)
                 
+                    ## Publishing invoice of service
+                    invoice = self.controller.GetInvoice(imdb_items)
+                    self.PublishInvoice(invoice)
+                    
         except Exception as inst:
               ros_node.ParseException(inst)
 
