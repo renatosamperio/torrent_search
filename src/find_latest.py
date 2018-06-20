@@ -286,7 +286,7 @@ class PostHelper:
             imdb_year       = str(imdb_item['year'])
             imdb_title_url  = str(imdb_item['title_url'])
             imdb_image_url  = str(imdb_item['image_url'])
-            imdb_plot       = str(imdb_item['plot']).encode('utf-8').strip()
+            imdb_plot       = imdb_item['plot'].encode('utf-8').strip()
             
             if imdb_item['year'] is None:
                 torrent_year        = str(torrent_info['year'])
