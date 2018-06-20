@@ -62,6 +62,7 @@ class MovieFinder:
         try:
             from operator import itemgetter
             from imdbpie import Imdb
+            logging.getLogger('imdbpie').setLevel(logging.getLevelName('DEBUG'))
             
             imdb            = Imdb()
             updated_imdb    = []
