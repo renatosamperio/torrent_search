@@ -130,14 +130,14 @@ class MovieFinder:
                 ## Retrieving additional IMDB information
                 ##   and adding item
                 if item_added:
-                    imdb_id                 = imdb_item['imdb_id']
-                    title_info              = imdb.get_title(imdb_id)
-                    title_genres            = imdb.get_title_genres(imdb_id)
-                    
-                    ## Finding genre 
-                    if title_genres is not None and 'genres' in title_genres:
-                        genres_label         = str(', '.join(title_genres['genres']))
-                        imdb_item.update({'genres': genres_label})
+                    imdb_id                 = str(imdb_item['imdb_id'])
+                    try:
+                        title_genres        = imdb.get_title_genres(imdb_id)
+                        
+                        ## Finding genre 
+                        if title_genres is not None and 'genres' in title_genres:
+                            genres_label         = str(', '.join(title_genres['genres']))
+                            imdb_item.update({'genres': genres_label})
 
                     ## Finding image
                     imdb_image_url          = ''
