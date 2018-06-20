@@ -42,7 +42,7 @@ class MovieFinder:
             ## Removing special works from torrent
             splitted        = sentence.strip().split()
             new_sentence    = []
-            
+
             ## Split sentence and look if every word
             ##    is in the special list of characters
             ##    to remove.
@@ -50,6 +50,9 @@ class MovieFinder:
                 if token.lower() not in list_terms:
                     new_sentence.append(token)
             new_sentence    = ' '.join(new_sentence)
+            
+            ## Removing non-expected characters
+            new_sentence = re.sub('[@#$()]', '', new_sentence)
             
             return new_sentence
         except Exception as inst:
