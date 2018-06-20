@@ -139,43 +139,53 @@ class MovieFinder:
                             genres_label         = str(', '.join(title_genres['genres']))
                             imdb_item.update({'genres': genres_label})
 
-                    ## Finding image
-                    imdb_image_url          = ''
-                    if 'image' in title_info['base'].keys():
-                        imdb_image_url          = title_info['base']['image']['url']
-                    else:
-                        rospy.logdebug("-   Image URL not found")
-                        rospy.logdebug("-   Looking in similarities for images...")
-                        for similarity_item in title_info['similarities']:
-                            itemKeys        = similarity_item.keys()
-                            if 'image' in itemKeys:
-                                imageKey    = similarity_item['image'].keys()
-                                if 'url' in imageKey:
-                                    imdb_image_url = similarity_item['image']['url']
-                                    rospy.logdebug("      Using image from similarities")
-                                    break
-                    ## Finding raiting
-                    imdb_raiting            = ''
-                    if 'rating' in title_info['ratings'].keys():
-                        imdb_raiting        = str(title_info['ratings']['rating'])
-                    else:
-                        rospy.logdebug("-   Raiting not found")
+                    except LookupError as imdb_error:
+                        rospy.loginfo("+   Title genres not found for IMDB id [%s]"%imdb_id)
+                        utilities.ParseException(imdb_error)
                     
-                    ## Finding movie plot
-                    imdb_plot               = ''
-                    if 'outline' in title_info['plot'].keys():
-                        imdb_plot           = title_info['plot']['outline']['text']
-                    else:
-                        rospy.logdebug("-   Plot not found")
-
-                    ## Creating data structure
-                    imdb_title_url          = title_info['base']['id']
-                    imdb_item.update({'raiting':    imdb_raiting})
-                    imdb_item.update({'plot':       imdb_plot})
-                    imdb_item.update({'image_url':  imdb_image_url})
-                    imdb_item.update({'title_url':  'http://www.imdb.com/'+imdb_title_url})
-                    imdb_selected.append(imdb_item)
-            
+                    try:
+                        title_info          = imdb.get_title(imdb_id)
+                        
+                        ## Finding image
+                        imdb_image_url          = ''
+                        if 'image' in title_info['base'].keys():
+                            imdb_image_url          = title_info['base']['image']['url']
+                        else:
+                            rospy.logdebug("-   Image URL not found")
+                            rospy.logdebug("-   Looking in similarities for images...")
+                            for similarity_item in title_info['similarities']:
+                                itemKeys        = similarity_item.keys()
+                                if 'image' in itemKeys:
+                                    imageKey    = similarity_item['image'].keys()
+                                    if 'url' in imageKey:
+                                        imdb_image_url = similarity_item['image']['url']
+                                        rospy.logdebug("      Using image from similarities")
+                                        break
+                        ## Finding raiting
+                        imdb_raiting            = ''
+                        if 'rating' in title_info['ratings'].keys():
+                            imdb_raiting        = str(title_info['ratings']['rating'])
+                        else:
+                            rospy.logdebug("-   Raiting not found")
+                        
+                        ## Finding movie plot
+                        imdb_plot               = ''
+                        if 'outline' in title_info['plot'].keys():
+                            imdb_plot           = title_info['plot']['outline']['text']
+                        else:
+                            rospy.logdebug("-   Plot not found")
+    
+                        ## Creating data structure
+                        imdb_title_url          = title_info['base']['id']
+                        imdb_item.update({'raiting':    imdb_raiting})
+                        imdb_item.update({'plot':       imdb_plot})
+                        imdb_item.update({'image_url':  imdb_image_url})
+                        imdb_item.update({'title_url':  'http://www.imdb.com/'+imdb_title_url})
+                        imdb_selected.append(imdb_item)
+                    except LookupError as imdb_error:
+                        rospy.loginfo("+   Title info not found for IMDB id [%s]"%imdb_id)
+                        utilities.ParseException(imdb_error)
+                        
             item_selected.update({'imdb_info':imdb_selected})
             item_selected.update({'torrent_info':torrent_info})
         except Exception as inst:
