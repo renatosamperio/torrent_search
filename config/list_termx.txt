@@ -5,7 +5,6 @@ hdrip
 ac3
 etrg
 720p
-eng
 cam
 jaybob
 1080pyifydvd
