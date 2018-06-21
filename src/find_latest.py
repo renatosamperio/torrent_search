@@ -355,6 +355,7 @@ class FindLatest():
                     rospy.logdebug("  +   Setting up channel [%s]"%self.slack_channel)
                 elif "list_term" == key:
                     if value is not None:
+                        rospy.logdebug("  +   Loading list of terms")
                         self.list_terms = self.LoadTerms(value)
             
             self.Init()
@@ -459,7 +460,8 @@ class FindLatest():
                     fields      = self.post_helper.prepare_fields(torrent_info, imdb_item)
                     attachments = self.post_helper.prepare_attachment(torrent_info, imdb_item, fields=fields)
     
-                    rospy.logdebug('+    Posting in slack')
+                    rospy.logdebug('+    Posting in slack for [%s]'%
+                               (str(imdb_item['title'])))
                     response = self.slack_client.PostMessage(
                         self.slack_channel, "",
                         username='',
