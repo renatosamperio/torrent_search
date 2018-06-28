@@ -119,7 +119,7 @@ class FinderNode(ros_node.RosNode):
                     imdb_items = self.controller.GetMovies()
                     
                     ## Post into slack
-                    rospy.loginfo('+ Posting latest records')
+                    rospy.loginfo('+ Posting [%s] latest records'%str(len(imdb_items)))
                     self.controller.PostMovies(imdb_items)
                 
                     ## Publishing invoice of service
