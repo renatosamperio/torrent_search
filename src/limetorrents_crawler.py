@@ -207,7 +207,7 @@ class LimeTorrentsCrawler(Config):
             soup = self.http_request(proxy)
             try:
                 ## print "=== What is self.soup?",self.soup
-                if soup is not None and soup == -1 or 'limetorrents' not in soup.find('div', id='logo').a['title'].lower():
+                if soup is not None and soup == -1:
                     rospy.logdebug("Bad proxy!")
                     count += 1
                     if count == len(self.proxies):
