@@ -1,6 +1,8 @@
 <launch>
   <rosparam command="load" file="/opt/home_services/src/home_services/cfg/hs_params.yaml" />
-  <node name="finder_node" pkg="torrent_search" type="finder_node.py" args="--debug"/>
+
+  <param name="/torrent_finder/list_term" value="$(find torrent_search)/config/list_termx.txt" />
+  <node name="finder_node" pkg="torrent_search" type="finder_node.py" args="--debug" output="log"/>
 
 <!-- Comment -->
 </launch>
