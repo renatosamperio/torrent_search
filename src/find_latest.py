@@ -545,4 +545,4 @@ if __name__ == '__main__':
     ## Executing task action for finding latest changes
     taskAction  = FindLatest(**args)
     imdb_items  = taskAction.GetMovies(['seeds'])
-    #taskAction.PostNew(newest_items)
+
