@@ -1,0 +1,369 @@
+#!/usr/bin/env python
+
+'''
+rostopic pub /start torrent_search/State "header: auto
+magnet: 'magnet:?xt=urn:btih:2EAB6D69E8206C982EC29F4E88B5AF83A4E7EAC2&dn=Aquaman+%282018%29&tr=udp%3A%2F%2Fglotorrents.pw%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Fp4p.arenabg.com%3A1337&tr=udp%3A%2F%2Ftracker.internetwarriors.net%3A1337&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftorrent.gresille.org%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fopen.demonii.com:%3A1337%2Fannounce'
+state: 'configure'" -1; 
+'''
+
+import sys, os
+import threading
+import rospy
+import datetime
+import time
+import json
+import Queue
+
+from optparse import OptionParser, OptionGroup
+from pprint import pprint
+
+from hs_utils import ros_node, logging_utils
+from hs_utils import message_converter as mc
+from hs_utils import json_message_converter as rj
+from hs_utils.mongo_handler import MongoAccess
+from torrent_search.msg import State
+
+from transitions import Machine
+import libtorrent as lt
+
+class TorrentDownloader(object):
+    def __init__(self, **kwargs):
+        try:
+            self.state_str = [
+                    'queued', 
+                    'checking', 
+                    'downloading metadata',
+                    'downloading', 
+                    'finished', 
+                    'seeding', 
+                    'allocating'
+            ]
+              
+            self.ses = lt.session()
+            self.handle = None
+            self.status = None
+            self.not_complete = True
+            self.close_now = True
+            
+            ## Parsing arguments
+            for key, value in kwargs.iteritems():
+                if "save_path" == key:
+                    self.save_path = value
+                elif "up_limit" == key:
+                    self.up_limit = value
+                elif "max_connections" == key:
+                    self.max_connections = value
+
+            self.params = { 'save_path': self.save_path}
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
+    def set_up_configuration(self, link=None): 
+        try:
+            rospy.logdebug('---> Setting up configuration')
+            link = 'magnet:?xt=urn:btih:2a1ce38fd6f061e928eb61f492066a5994a9fd0f&dn=Aquaman.2018.DVDR.NTSC.YG&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80&tr=udp%3A%2F%2Fopen.demonii.com%3A1337&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Fexodus.desync.com%3A6969'
+            #link = 'magnet:?xt=urn:btih:5D4CC6441554B218E2C5C966C02B0134FCF23B1C&amp;dn=Aquaman+%282018%29+%5B3D%5D+%5BYTS.LT%5D'
+            
+            link = "magnet:?xt=urn:btih:2EAB6D69E8206C982EC29F4E88B5AF83A4E7EAC2&dn=Aquaman+%282018%29&tr=udp%3A%2F%2Fglotorrents.pw%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Fp4p.arenabg.com%3A1337&tr=udp%3A%2F%2Ftracker.internetwarriors.net%3A1337&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftorrent.gresille.org%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fopen.demonii.com:%3A1337%2Fannounce"
+            self.handle = lt.add_magnet_uri(self.ses, link, self.params)
+            
+            rospy.loginfo('     Downloading metadata...')
+            while (not self.handle.has_metadata() and self.close_now): 
+                time.sleep(0.5)
+            rospy.logdebug('     Got metadata, starting torrent download...')
+            
+            self.status = self.handle.status()
+            
+            ## Setting up connection options
+            self.handle.set_upload_limit(self.up_limit)
+            self.handle.set_max_connections(self.max_connections)
+            
+            ## Moving to next state
+            self.download()
+        except Exception as inst:
+              ros_node.ParseException(inst)
+              
+    def start_downloading(self): 
+        try:
+            if not self.is_Downloading():
+                self.failed_downloading()
+            else:
+                rospy.logdebug('---> Starting to download')
+             
+                while (not self.status.is_seeding and self.not_complete):
+                    self.status = self.handle.status()
+                    
+                    rospy.loginfo(' %.2f%% complete (down: %.1f kb/s, up: %.1f kB/s, peers: %d) %s' % (
+                        self.status.progress * 100, 
+                        self.status.download_rate / 1000, 
+                        self.status.upload_rate / 1000, 
+                         
+                        self.status.num_peers, self.state_str[self.status.state]
+                    ))
+                    
+#                     print "===> close_now:", self.close_now
+                    if not self.close_now:
+                        print "===> CLOSING"
+                        break
+                
+                    if self.status.progress  >= 1.0:
+                        self.not_complete = False
+                        print "===> FALSE"
+                    else:
+                        time.sleep(1)
+                
+#                     print "===> not_complete:", self.not_complete
+#                     print "===> status.is_seeding:", self.status.is_seeding
+#                     print "===> status:", self.status_seeding
+                print "Download finished"
+        except Exception as inst:
+              ros_node.ParseException(inst)
+              
+    def close_torrent(self): 
+        try:
+            rospy.logdebug('---> Closing torrent')
+        except Exception as inst:
+              ros_node.ParseException(inst)
+              
+    def pausing_download(self): 
+        try:
+            rospy.logdebug('---> Pausing download')
+        except Exception as inst:
+              ros_node.ParseException(inst)
+              
+    def restore_download(self): 
+        try:
+            rospy.logdebug('---> Restore download')
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
+    def failed_downloading(self): 
+        try:
+            rospy.logwarn('---> Failed downloading...')
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
+class DownloaderFSM:
+    def __init__(self, **kwargs):
+        try:
+            # The states
+            self.states=['Start', 'Setup', 'Downloading', 'Paused', 'Finished', 'Error']
+            
+            # And some transitions between states. We're lazy, so we'll leave out
+            # the inverse phase transitions (freezing, condensation, etc.).
+            self.transitions = [
+                { 'trigger': 'configure',           'source': 'Start',          'dest': 'Setup' },
+                { 'trigger': 'download',            'source': 'Setup',          'dest': 'Downloading' },
+                { 'trigger': 'done',                'source': 'Downloading',    'dest': 'Finished' },
+                { 'trigger': 'pause',               'source': 'Downloading',    'dest': 'Paused' },
+                { 'trigger': 'unpause',             'source': 'Paused',         'dest': 'Downloading' },
+                { 'trigger': 'fail_setup',          'source': 'Setup',          'dest': 'Error' },
+                { 'trigger': 'failed_downloading',  'source': 'Downloading',    'dest': 'Error' },
+                { 'trigger': 'failed_pause',        'source': 'Paused',         'dest': 'Error' },
+                { 'trigger': 'failed_closing',      'source': 'Finished',       'dest': 'Error' }
+            ]
+            
+            # Initialize
+            self.fsm = TorrentDownloader(**kwargs)
+            self.machine = Machine(self.fsm, 
+                                   states=self.states, 
+                                   transitions=self.transitions, 
+                                   initial='Start')
+            
+            self.machine.on_enter_Setup('set_up_configuration')
+            self.machine.on_enter_Downloading('start_downloading')
+            self.machine.on_enter_Finished('close_torrent')
+            self.machine.on_enter_Paused('pausing_download')
+            self.machine.on_exit_Paused('restore_download')
+            
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
+    def next(self, next_state, **args):
+        try:
+            if next_state == 'configure':
+                
+                if "link" not in args.keys() :
+                    rospy.logwarn('No link included in state transition')
+                    return
+                self.fsm.configure(link=args['link'])
+            elif next_state == 'download':
+                self.fsm.download()
+            elif next_state == 'pause':
+                self.fsm.pause()
+            elif next_state == 'unpause':
+                self.fsm.unpause()
+            elif next_state == 'done':
+                self.fsm.done()
+            
+            rospy.logdebug('Current state: '+self.fsm.state)
+        except Exception as inst:
+              ros_node.ParseException(inst)
+    
+    def close(self):
+        try:
+            self.fsm.close_now = False
+            print "-", self.fsm.close_now
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
+class DownloadTorrent(ros_node.RosNode):
+    def __init__(self, **kwargs):
+        try:
+            
+            ## Local variables
+            self.downloader     = None
+            
+            ## This variable has to be started before ROS
+            ##   params are called
+            self.lock       = threading.Lock()
+            self.condition  = threading.Condition()
+            self.queue      = Queue.Queue()
+            
+            ## Shutdown signal
+            rospy.on_shutdown(self.ShutdownCallback)
+            
+            ## Initialising parent class with all ROS stuff
+            super(DownloadTorrent, self).__init__(**kwargs)
+            
+            ## Local FSM
+            self.downloader = DownloaderFSM(**kwargs)
+            
+            ## Initialise node activites
+            self.Init()
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
+    def Init(self):
+        try:
+            
+            ## Executioning thread
+            rospy.Timer(rospy.Duration(0.5), self.Run, oneshot=True)
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
+    def SubscribeCallback(self, msg, topic):
+        try:
+
+            ## Add item to queue
+            #with self.lock:
+            self.queue.put((topic, msg))
+
+            ## Notify data is in the queue
+            with self.condition:
+                self.condition.notifyAll()
+
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
+    def Run(self, event):
+        ''' Run method '''
+        try:
+            rospy.logdebug('Running FSM')
+            while not rospy.is_shutdown():
+                ## Wait for being notified that a message
+                ##    has arrived
+                with self.condition:
+                    rospy.logdebug('  Waiting for message...')
+                    self.condition.wait()
+                
+                with self.lock:
+                    (topic, msg) = self.queue.get()
+                
+                ## Preparing state transition with input data
+                args = {}
+                if 'start' in topic:
+                    args.update({'link': msg.magnet})
+                
+                ## Going to next state
+                self.downloader.next(msg.state, **args)
+
+        except Exception as inst:
+              ros_node.ParseException(inst)
+          
+    def ShutdownCallback(self):
+        try:
+            rospy.logdebug('+ Shutdown: Closing torrent down loader')
+            self.downloader.close()
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
+if __name__ == '__main__':
+    usage       = "usage: %prog option1=string option2=bool"
+    parser      = OptionParser(usage=usage)
+    parser.add_option('--queue_size',
+                type="int",
+                action='store',
+                default=1000,
+                help='Topics to play')
+    parser.add_option('--latch',
+                action='store_true',
+                default=False,
+                help='Message latching')
+    parser.add_option('--debug',
+                action='store_true',
+                default=False,
+                help='Provide debug level')
+    parser.add_option('--syslog',
+                action='store_true',
+                default=False,
+                help='Start with syslog logger')
+
+    setup_opts = OptionGroup(parser, "Downloading options")
+    setup_opts.add_option('--save_path',
+                type="string",
+                action='store',
+                default='/opt/data/tmp',
+                help='Path to downloaded items')
+    setup_opts.add_option('--up_limit',
+                type="int",
+                action='store',
+                default=50*1000,
+                help='Upload limit (bytes)')
+    setup_opts.add_option('--max_connections',
+                type="int",
+                action='store',
+                default=-1,
+                help='Maximum connections')
+    
+    parser.add_option_group(setup_opts)
+    (options, args) = parser.parse_args()
+    
+    args            = {}
+    logLevel        = rospy.DEBUG if options.debug else rospy.INFO
+    rospy.init_node('download_torrent', anonymous=False, log_level=logLevel)
+    
+    ## Sending logging to syslog
+    if options.syslog:
+        logging_utils.update_loggers()
+
+    ## Defining static variables for subscribers and publishers
+    sub_topics     = [
+        ('move_state',  State),
+        ('start',       State),
+    ]
+    pub_topics     = [
+#         ('/event_locator/updated_events', WeeklyEvents)
+    ]
+    system_params  = [
+        #'/event_locator_param'
+    ]
+    
+    ## Defining arguments
+    args.update({'up_limit':        options.up_limit})
+    args.update({'max_connections': options.max_connections})
+    args.update({'save_path':       options.save_path})
+
+    args.update({'queue_size':      options.queue_size})
+    args.update({'latch':           options.latch})
+    args.update({'sub_topics':      sub_topics})
+    args.update({'pub_topics':      pub_topics})
+    
+    # Go to class functions that do all the heavy lifting.
+    try:
+        spinner = DownloadTorrent(**args)
+    except rospy.ROSInterruptException:
+        pass
+    # Allow ROS to go to all callbacks.
+    rospy.spin()
+
