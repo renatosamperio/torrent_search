@@ -4,6 +4,10 @@
 rostopic pub /start torrent_search/State "header: auto
 magnet: 'magnet:?xt=urn:btih:2EAB6D69E8206C982EC29F4E88B5AF83A4E7EAC2&dn=Aquaman+%282018%29&tr=udp%3A%2F%2Fglotorrents.pw%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Fp4p.arenabg.com%3A1337&tr=udp%3A%2F%2Ftracker.internetwarriors.net%3A1337&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftorrent.gresille.org%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fopen.demonii.com:%3A1337%2Fannounce'
 state: 'configure'" -1; 
+
+
+rostopic pub /move_state torrent_search/State "header: auto
+state: 'pause'" -1; 
 '''
 
 import sys, os
@@ -44,6 +48,8 @@ class TorrentDownloader(object):
             self.status = None
             self.not_complete = True
             self.close_now = True
+            self.download_started = False
+            self.previous_state = 'None'
             
             ## Parsing arguments
             for key, value in kwargs.iteritems():
@@ -55,12 +61,18 @@ class TorrentDownloader(object):
                     self.max_connections = value
 
             self.params = { 'save_path': self.save_path}
+            
+            
+            ## This variable has to be started before ROS
+            ##   params are called
+            self.fsm_condition  = threading.Condition()
+            
         except Exception as inst:
               ros_node.ParseException(inst)
 
     def set_up_configuration(self, link=None): 
         try:
-            rospy.logdebug('---> Setting up configuration')
+            rospy.logdebug('---> Setting up configuration ['+self.previous_state+'] -> ['+self.state+']')
             link = 'magnet:?xt=urn:btih:2a1ce38fd6f061e928eb61f492066a5994a9fd0f&dn=Aquaman.2018.DVDR.NTSC.YG&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80&tr=udp%3A%2F%2Fopen.demonii.com%3A1337&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Fexodus.desync.com%3A6969'
             #link = 'magnet:?xt=urn:btih:5D4CC6441554B218E2C5C966C02B0134FCF23B1C&amp;dn=Aquaman+%282018%29+%5B3D%5D+%5BYTS.LT%5D'
             
@@ -88,52 +100,49 @@ class TorrentDownloader(object):
             if not self.is_Downloading():
                 self.failed_downloading()
             else:
-                rospy.logdebug('---> Starting to download')
+                if not self.download_started:
+                    self.download_started = True
+                    rospy.logdebug('---> Starting to download ['+self.previous_state+'] -> ['+self.state+']')
+                    
+                    ## Downloading thread
+                    rospy.Timer(rospy.Duration(0.5), self.downloader_thread, oneshot=True)
+                else:
+                    rospy.logdebug('---> Download thread already started  ['+self.previous_state+'] -> ['+self.state+']')
              
-                while (not self.status.is_seeding and self.not_complete):
-                    self.status = self.handle.status()
-                    
-                    rospy.loginfo(' %.2f%% complete (down: %.1f kb/s, up: %.1f kB/s, peers: %d) %s' % (
-                        self.status.progress * 100, 
-                        self.status.download_rate / 1000, 
-                        self.status.upload_rate / 1000, 
-                         
-                        self.status.num_peers, self.state_str[self.status.state]
-                    ))
-                    
-#                     print "===> close_now:", self.close_now
-                    if not self.close_now:
-                        print "===> CLOSING"
-                        break
-                
-                    if self.status.progress  >= 1.0:
-                        self.not_complete = False
-                        print "===> FALSE"
-                    else:
-                        time.sleep(1)
-                
-#                     print "===> not_complete:", self.not_complete
-#                     print "===> status.is_seeding:", self.status.is_seeding
-#                     print "===> status:", self.status_seeding
-                print "Download finished"
         except Exception as inst:
               ros_node.ParseException(inst)
               
     def close_torrent(self): 
         try:
             rospy.logdebug('---> Closing torrent')
+            self.download_started = False
+            self.reset()
         except Exception as inst:
               ros_node.ParseException(inst)
               
     def pausing_download(self): 
         try:
-            rospy.logdebug('---> Pausing download')
+            if not self.is_Paused():
+                self.failed_pause()
+            else:
+                rospy.logdebug('---> Pausing download')
+                self.ses.pause()
         except Exception as inst:
               ros_node.ParseException(inst)
               
     def restore_download(self): 
         try:
-            rospy.logdebug('---> Restore download')
+            if not self.is_Paused():
+                self.failed_pause()
+            else:
+                rospy.logdebug('---> Restore download ['+self.previous_state+'] -> ['+self.state+']')
+                
+            ## Notify data is in the queue
+            with self.fsm_condition:
+                self.fsm_condition.notifyAll()
+            
+            ## Resume session
+            self.ses.resume()
         except Exception as inst:
               ros_node.ParseException(inst)
 
@@ -143,6 +152,53 @@ class TorrentDownloader(object):
         except Exception as inst:
               ros_node.ParseException(inst)
 
+    def reset_downloader(self): 
+        try:
+            rospy.logwarn('---> Resetting downloader...')
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
+    def downloader_thread(self, event):
+        ''' Run method '''
+        try:
+            while (not self.status.is_seeding and self.not_complete):
+                if self.state == 'Paused':
+                    with self.fsm_condition:
+                        rospy.logdebug('  Download has been halted')
+                        self.fsm_condition.wait()
+                    
+                self.status = self.handle.status()
+                
+                #rospy.logdebug('['+self.previous_state+'] -> ['+self.state+']')
+                rospy.loginfo(' %.2f%% complete (down: %.1f kb/s, up: %.1f kB/s, peers: %d) %s ['+self.previous_state+'] -> ['+self.state+']' % (
+                    self.status.progress * 100, 
+                    self.status.download_rate / 1000, 
+                    self.status.upload_rate / 1000, 
+                     
+                    self.status.num_peers, self.state_str[self.status.state]
+                ))
+                
+#                     print "===> close_now:", self.close_now
+                if not self.close_now:
+                    print "===> CLOSING"
+                    break
+            
+                if self.status.progress  >= 1.0:
+                    self.not_complete = False
+                    print "===> FALSE"
+                else:
+                    time.sleep(1)
+            
+#                     print "===> not_complete:", self.not_complete
+#                     print "===> status.is_seeding:", self.status.is_seeding
+#                     print "===> status:", self.status_seeding
+
+            ## Moving to next state
+            print "Download finished"
+            self.done()
+        except Exception as inst:
+              ros_node.ParseException(inst)
+            
 class DownloaderFSM:
     def __init__(self, **kwargs):
         try:
@@ -157,6 +213,7 @@ class DownloaderFSM:
                 { 'trigger': 'done',                'source': 'Downloading',    'dest': 'Finished' },
                 { 'trigger': 'pause',               'source': 'Downloading',    'dest': 'Paused' },
                 { 'trigger': 'unpause',             'source': 'Paused',         'dest': 'Downloading' },
+                { 'trigger': 'reset',               'source': 'Finished',       'dest': 'Start' },
                 { 'trigger': 'fail_setup',          'source': 'Setup',          'dest': 'Error' },
                 { 'trigger': 'failed_downloading',  'source': 'Downloading',    'dest': 'Error' },
                 { 'trigger': 'failed_pause',        'source': 'Paused',         'dest': 'Error' },
@@ -175,12 +232,20 @@ class DownloaderFSM:
             self.machine.on_enter_Finished('close_torrent')
             self.machine.on_enter_Paused('pausing_download')
             self.machine.on_exit_Paused('restore_download')
+            self.machine.on_exit_Paused('reset_downloader')
             
         except Exception as inst:
               ros_node.ParseException(inst)
 
     def next(self, next_state, **args):
         try:
+            #print "===> next_state", next_state
+            #print "===> args", args
+            ## Keeping previous state
+            self.fsm.previous_state = self.fsm.state
+            rospy.logdebug('Previous state: '+self.fsm.previous_state)
+            
+            ## Rotating FSM
             if next_state == 'configure':
                 
                 if "link" not in args.keys() :
@@ -196,7 +261,7 @@ class DownloaderFSM:
             elif next_state == 'done':
                 self.fsm.done()
             
-            rospy.logdebug('Current state: '+self.fsm.state)
+            rospy.loginfo('Current state: '+self.fsm.state)
         except Exception as inst:
               ros_node.ParseException(inst)
     
@@ -246,7 +311,6 @@ class DownloadTorrent(ros_node.RosNode):
         try:
 
             ## Add item to queue
-            #with self.lock:
             self.queue.put((topic, msg))
 
             ## Notify data is in the queue
@@ -339,8 +403,8 @@ if __name__ == '__main__':
 
     ## Defining static variables for subscribers and publishers
     sub_topics     = [
-        ('move_state',  State),
-        ('start',       State),
+        ('~move_state',  State),
+        ('~start',       State),
     ]
     pub_topics     = [
 #         ('/event_locator/updated_events', WeeklyEvents)
