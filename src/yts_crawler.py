@@ -60,6 +60,15 @@ class YtsRequests(object):
                 condition   = {'id': item_id}
                 posts       = self.db_handler.Find(condition)
                 if posts.count() < 1:
+                    rospy.logdebug('  Adding state element to item')
+                    item.update({
+                        'hs_state': {
+                            'history': [],
+                            'status:': 'created',
+
+                        }
+                    })
+                    
                     rospy.logdebug("Torrent item [%d] not found"%(item_id))
                     post_id = self.db_handler.Insert(item)
                     if post_id is not None:
@@ -73,7 +82,7 @@ class YtsRequests(object):
                     error, output =utilities.compare_dictionaries(
                             old_item, new_item, 
                             "stored", "new_item",
-                            ignore_keys=['_id'], 
+                            ignore_keys=['_id', 'hs_state'], 
                             use_values=True
                     )
                     
@@ -81,25 +90,32 @@ class YtsRequests(object):
                         rospy.logdebug("  Found item [%s] is similar to received message"%item_id)
                         continue
                     
-                    ## Making the right label
-                    label = ""
+                    ## Making a label whenever missing or different dictionaries
+                    ##    are compared.
+                    label = "with "
+                    info_label = ''
                     if len(output['different'])>0:
                         label = "[%d] different item(s) "%len(output['different'])
+                        info_label += 'different '
                     if len(output['missing'])>0:
                         if len(label)>0:
                             label += 'and '
+                            info_label += 'and '
                         label += "[%d] missing item(s) "%len(output['missing'])
-                    
+                        info_label += 'missing '
                     if len(label)>0:
                         rospy.loginfo('  Found %s'%label)
-
-                    ## An error returns False
-                    #rospy.logwarn (error)
-                    #pprint(output)
+                        info_label += 'items'
+                        ##pprint(output)
+                    
+                    ## Passing torrent state
+                    new_item.update({
+                        'hs_state': old_item['hs_state']
+                    })
                     
                     ##Update new item
                     result = self.db_handler.Update(condition, new_item)
-                    rospy.loginfo("  Updated item [%d] "%(item_id))
+                    rospy.loginfo("  Updated item [%d] %s"%(item_id, info_label))
 
         except Exception as inst:
               ros_node.ParseException(inst)
@@ -147,7 +163,7 @@ class YtsRequests(object):
                 'movie_count':  movie_count,
                 'query_size':   query_size,
             }
-            rospy.loginfo("  Pulled "+str(page_number)+" of "+str(query_size) )
+            rospy.logdebug("  Pulled "+str(page_number)+" of "+str(query_size) )
             return reply
         except Exception as inst:
               ros_node.ParseException(inst)
