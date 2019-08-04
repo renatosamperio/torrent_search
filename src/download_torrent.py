@@ -458,11 +458,24 @@ class DownloadTorrent(ros_node.RosNode):
                     (topic, msg) = self.queue.get()
                     
                 args = {}
-                if 'start' in topic:
-                    args.update({'link': msg.magnet})
+                if 'move_state' in topic:
+                    self.downloader.next(msg.state, **args)
                 
-                ## Going to next state
-                self.downloader.next(msg.state, **args)
+                else:
+                    
+                    ## Get best magnet to download
+                    torrent_info = self.downloader.choose_magnet(msg, topic)
+                    if len(torrent_info) < 1 or torrent_info is None:
+                        rospy.logwarn('Invalid torrent data provided')
+                        return
+                    
+                    ## Preparing state transition with input data
+                    args = {
+                        'torrent_info': torrent_info
+                    }
+                    
+                    ## Going to next state
+                    self.downloader.next('configure', **args)
 
         except Exception as inst:
               ros_node.ParseException(inst)
