@@ -39,7 +39,7 @@ class YtsRequests(object):
             connected       = self.db_handler.Connect(self.database, self.collection)
             ## Checking if DB connection was successful
             if not connected:
-                rospy.logwarn('Events DB not available')
+                rospy.logwarn('DB not available')
             else:
                 rospy.loginfo("Created DB handler in %s.%s"%
                               (self.database, self.collection))
@@ -64,7 +64,7 @@ class YtsRequests(object):
                     item.update({
                         'hs_state': {
                             'history': [],
-                            'status:': 'created',
+                            'status': 'created',
 
                         }
                     })
