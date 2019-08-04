@@ -51,6 +51,8 @@ class TorrentDownloader(object):
             self.close_now = True
             self.download_started = False
             self.previous_state = 'None'
+            self.database = None
+            self.collection = None
             
             ## Parsing arguments
             for key, value in kwargs.iteritems():
@@ -60,9 +62,22 @@ class TorrentDownloader(object):
                     self.up_limit = value
                 elif "max_connections" == key:
                     self.max_connections = value
+                elif "database" == key:
+                    self.database = value
+                elif "collection" == key:
+                    self.collection = value
 
             self.params = { 'save_path': self.save_path}
             
+            ## Creating DB handler
+            self.db_handler = MongoAccess()
+            connected       = self.db_handler.Connect(self.database, self.collection)
+            ## Checking if DB connection was successful
+            if not connected:
+                rospy.logwarn('DB not available')
+            else:
+                rospy.loginfo("Created DB handler in %s.%s"%
+                              (self.database, self.collection))
             
             ## This variable has to be started before ROS
             ##   params are called
@@ -308,6 +323,10 @@ class DownloadTorrent(ros_node.RosNode):
             super(DownloadTorrent, self).__init__(**kwargs)
             
             ## Local FSM
+            kwargs.update({
+                'database':     'yts',
+                'collection':   'torrents'
+            })
             self.downloader = DownloaderFSM(**kwargs)
             
             ## Initialise node activites
