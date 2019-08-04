@@ -329,6 +329,52 @@ class DownloaderFSM:
         except Exception as inst:
               ros_node.ParseException(inst)
 
+    def choose_magnet(self, msg, topic):
+        torrent_info = []
+        try:
+            rospy.loginfo('Getting magnet to download')
+            ## Get best magnet to download
+            if 'found_torrents' not in topic:
+                return msg.magnet
+            
+            #pprint(msg)
+            torrent_template = {
+                'magnet' : '',
+                'id': '',
+                'title': ''
+            }
+            for i in range(len(msg.torrent_items)):
+                
+                ## Initialising list with empty magnets
+                item = msg.torrent_items[i]
+                torrent_info.append( copy.copy(torrent_template) )
+                
+                ## Looking into best match to download
+                rospy.logdebug('Looking torrents of [%s]'%item.title_long)
+                max_seeds = -1
+                for torrent in item.torrents:
+                    
+                    ## Get manget based on amount of seeds
+                    if torrent.seeds > max_seeds:
+                        max_seeds = torrent.seeds
+                        torrent_info[i]['magnet']   = torrent.magnet
+                        torrent_info[i]['id']       = item.id
+                        torrent_info[i]['title']    = item.title_long
+                        
+                        rospy.loginfo('Getting [%s] for %s-%s of %s with %d/%d'%
+                                      (item.title_long, torrent.type, 
+                                       torrent.quality, torrent.size,
+                                       torrent.seeds, torrent.peers))
+                        
+                    ## TODO: Make rules to download
+                    ##        - Quality
+                    ##        - Does it has seeds/peers?
+                    ##        - Has it been already downloaded?
+        except Exception as inst:
+              ros_node.ParseException(inst)
+        finally:
+            return torrent_info
+            
 class DownloadTorrent(ros_node.RosNode):
     def __init__(self, **kwargs):
         try:
