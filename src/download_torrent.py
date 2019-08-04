@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
 '''
-rostopic pub /start torrent_search/State "header: auto
-magnet: 'magnet:?xt=urn:btih:2EAB6D69E8206C982EC29F4E88B5AF83A4E7EAC2&dn=Aquaman+%282018%29&tr=udp%3A%2F%2Fglotorrents.pw%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Fp4p.arenabg.com%3A1337&tr=udp%3A%2F%2Ftracker.internetwarriors.net%3A1337&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftorrent.gresille.org%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fopen.demonii.com:%3A1337%2Fannounce'
+rostopic pub /download_torrent/start torrent_search/State "header: auto
+magnet: 'magnet:?xt=urn:btih:5A4140BD59D66BCAC57CF05AF4A8FAB4EBCAE1C1&dn=Avengers: Endgame (2019)&tr=udp%3A%2F%2Fglotorrents.pw%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Fp4p.arenabg.com%3A1337&tr=udp%3A%2F%2Ftracker.internetwarriors.net%3A1337&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftorrent.gresille.org%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fopen.demonii.com:%3A1337%2Fannounce'
 state: 'configure'" -1; 
 
 
-rostopic pub /move_state torrent_search/State "header: auto
+rostopic pub /download_torrent/move_state torrent_search/State "header: auto
 state: 'pause'" -1; 
 '''
 
@@ -42,7 +42,8 @@ class TorrentDownloader(object):
                     'seeding', 
                     'allocating'
             ]
-              
+            
+            rospy.logdebug('Starting torrent session')
             self.ses = lt.session()
             self.handle = None
             self.status = None
@@ -84,6 +85,7 @@ class TorrentDownloader(object):
                 time.sleep(0.5)
             rospy.logdebug('     Got metadata, starting torrent download...')
             
+            ## Updating torrent downloader state
             self.status = self.handle.status()
             
             ## Setting up connection options
@@ -97,6 +99,11 @@ class TorrentDownloader(object):
               
     def start_downloading(self): 
         try:
+            if torrent_info is None:
+                rospy.logwarn ('Downloading torrent failed as no torrent info was provided')
+                ## TODO: Send it to error state?
+                return
+            
             if not self.is_Downloading():
                 self.failed_downloading()
             else:
@@ -164,21 +171,30 @@ class TorrentDownloader(object):
             while (not self.status.is_seeding and self.not_complete):
                 if self.state == 'Paused':
                     with self.fsm_condition:
-                        rospy.logdebug('  Download has been halted')
+                        rospy.loginfo('  Download has been halted')
                         self.fsm_condition.wait()
-                    
+
                 self.status = self.handle.status()
                 
                 #rospy.logdebug('['+self.previous_state+'] -> ['+self.state+']')
-                rospy.loginfo(' %.2f%% complete (down: %.1f kb/s, up: %.1f kB/s, peers: %d) %s ['+self.previous_state+'] -> ['+self.state+']' % (
-                    self.status.progress * 100, 
-                    self.status.download_rate / 1000, 
-                    self.status.upload_rate / 1000, 
-                     
-                    self.status.num_peers, self.state_str[self.status.state]
+                progress        = self.status.progress * 100.0
+                download_rate   = self.status.download_rate / 1000
+                upload_rate     = self.status.upload_rate / 1000
+                num_peers       = self.status.num_peers
+                state           = self.state_str[self.status.state]
+                previous_state  = self.previous_state
+                current_state   = self.state
+                
+                rospy.loginfo(' %.2f%% complete (down: %.1f kb/s, up: %.1f kB/s, peers: %d) %s: [%s] -> [%s]'% (
+                    progress, 
+                    download_rate, 
+                    upload_rate, 
+                    num_peers, 
+                    state,
+                    previous_state,
+                    current_state
                 ))
                 
-#                     print "===> close_now:", self.close_now
                 if not self.close_now:
                     print "===> CLOSING"
                     break
@@ -333,8 +349,7 @@ class DownloadTorrent(ros_node.RosNode):
                 
                 with self.lock:
                     (topic, msg) = self.queue.get()
-                
-                ## Preparing state transition with input data
+                    
                 args = {}
                 if 'start' in topic:
                     args.update({'link': msg.magnet})
