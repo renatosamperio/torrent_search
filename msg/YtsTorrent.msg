@@ -1,0 +1,11 @@
+int64  peers
+string hash
+string url
+string type
+int64  date_uploaded_unix
+int64  seeds
+int64  size_bytes
+string quality
+string date_uploaded
+string size
+string magnet

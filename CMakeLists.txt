@@ -16,6 +16,14 @@ add_message_files(
   torrentQuery.msg
   torrentInvoice.msg
   State.msg
+  
+  ## YTS Torrent download
+  TriggerDownload.msg
+  YtsTorrents.msg
+  YtsTorrentInfo.msg
+  YtsState.msg
+  YtsTorrent.msg
+  YtsHistory.msg
 )
   
 # Generate added messages and services with any dependencies listed here

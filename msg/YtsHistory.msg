@@ -1,0 +1,2 @@
+string last_update
+string operation

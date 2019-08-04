@@ -1,0 +1,2 @@
+string       status
+YtsHistory[] history
