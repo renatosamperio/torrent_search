@@ -229,7 +229,33 @@ class TorrentDownloader(object):
             self.done()
         except Exception as inst:
               ros_node.ParseException(inst)
-            
+
+    def update_db_state(self, torrent_info):
+        try:
+            ## Accessing DB elemnt with ID
+            for torrent in torrent_info:
+                target_state = 'downloading'
+                rospy.logdebug("  Updating to [%s] state for %d/%s"%
+                               (target_state, torrent['id'], torrent['title']))
+                query = {'id': torrent['id']}
+                posts = self.db_handler.Find(query)
+                for element in posts:
+                    pprint(element)
+                    print "-"*10
+                    
+                ## Updating current torrent history and state
+                # 'hs_state': {u'history': [], u'status': u'created'}
+                    substitute = element['hs_state']
+                    substitute['status'] = target_state
+                    substitute['history'].append({
+                        'last_update': rospy.Time.now().to_sec(),
+                        'operation': ,
+                    })
+                    pprint(substitute)
+                    #updated_was_ok = self.db_handler.Update(query, substitute)
+        except Exception as inst:
+              ros_node.ParseException(inst)
+        
 class DownloaderFSM:
     def __init__(self, **kwargs):
         try:
