@@ -125,7 +125,7 @@ class TorrentDownloader(object):
         except Exception as inst:
               ros_node.ParseException(inst)
               
-    def start_downloading(self): 
+    def start_downloading(self, torrent_info=None): 
         try:
             if torrent_info is None:
                 rospy.logwarn ('Downloading torrent failed as no torrent info was provided')
@@ -135,6 +135,9 @@ class TorrentDownloader(object):
             if not self.is_Downloading():
                 self.failed_downloading()
             else:
+                ## Update torrent DB status
+                self.update_db_state(torrent_info)
+                
                 if not self.download_started:
                     self.download_started = True
                     rospy.logdebug('---> Starting to download ['+self.previous_state+'] -> ['+self.state+']')
