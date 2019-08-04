@@ -17,15 +17,15 @@ import datetime
 import time
 import json
 import Queue
+import copy
 
 from optparse import OptionParser, OptionGroup
 from pprint import pprint
 
 from hs_utils import ros_node, logging_utils
-from hs_utils import message_converter as mc
-from hs_utils import json_message_converter as rj
 from hs_utils.mongo_handler import MongoAccess
 from torrent_search.msg import State
+from torrent_search.msg import YtsTorrents
 
 from transitions import Machine
 import libtorrent as lt
@@ -418,8 +418,9 @@ if __name__ == '__main__':
 
     ## Defining static variables for subscribers and publishers
     sub_topics     = [
-        ('~move_state',  State),
-        ('~start',       State),
+        ('~move_state',                 State),
+        ('~start',                      State),
+        ('/yts_finder/found_torrents',  YtsTorrents)
     ]
     pub_topics     = [
 #         ('/event_locator/updated_events', WeeklyEvents)
