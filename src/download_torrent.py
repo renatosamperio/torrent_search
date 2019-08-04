@@ -321,10 +321,10 @@ class DownloaderFSM:
             ## Rotating FSM
             if next_state == 'configure':
                 
-                if "link" not in args.keys() :
-                    rospy.logwarn('No link included in state transition')
+                if "torrent_info" not in args.keys() :
+                    rospy.logwarn('No torrent info in state transition')
                     return
-                self.fsm.configure(link=args['link'])
+                self.fsm.configure(torrent_info=args['torrent_info'])
             elif next_state == 'download':
                 self.fsm.download()
             elif next_state == 'pause':
