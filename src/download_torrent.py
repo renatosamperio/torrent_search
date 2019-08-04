@@ -86,13 +86,26 @@ class TorrentDownloader(object):
         except Exception as inst:
               ros_node.ParseException(inst)
 
-    def set_up_configuration(self, link=None): 
+    def set_up_configuration(self, torrent_info=None): 
         try:
+            if torrent_info is None:
+                rospy.logwarn ('Setting up torrent failed as no torrent info was provided')
+                ## TODO: Send it to error state?
+                return
+            
             rospy.logdebug('---> Setting up configuration ['+self.previous_state+'] -> ['+self.state+']')
-            link = 'magnet:?xt=urn:btih:2a1ce38fd6f061e928eb61f492066a5994a9fd0f&dn=Aquaman.2018.DVDR.NTSC.YG&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80&tr=udp%3A%2F%2Fopen.demonii.com%3A1337&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Fexodus.desync.com%3A6969'
+            #link = 'magnet:?xt=urn:btih:2a1ce38fd6f061e928eb61f492066a5994a9fd0f&dn=Aquaman.2018.DVDR.NTSC.YG&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80&tr=udp%3A%2F%2Fopen.demonii.com%3A1337&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Fexodus.desync.com%3A6969'
             #link = 'magnet:?xt=urn:btih:5D4CC6441554B218E2C5C966C02B0134FCF23B1C&amp;dn=Aquaman+%282018%29+%5B3D%5D+%5BYTS.LT%5D'
             
-            link = "magnet:?xt=urn:btih:2EAB6D69E8206C982EC29F4E88B5AF83A4E7EAC2&dn=Aquaman+%282018%29&tr=udp%3A%2F%2Fglotorrents.pw%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Fp4p.arenabg.com%3A1337&tr=udp%3A%2F%2Ftracker.internetwarriors.net%3A1337&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftorrent.gresille.org%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fopen.demonii.com:%3A1337%2Fannounce"
+            #link = "magnet:?xt=urn:btih:2EAB6D69E8206C982EC29F4E88B5AF83A4E7EAC2&dn=Aquaman+%282018%29&tr=udp%3A%2F%2Fglotorrents.pw%3A6969%2Fannounce&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Fp4p.arenabg.com%3A1337&tr=udp%3A%2F%2Ftracker.internetwarriors.net%3A1337&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftorrent.gresille.org%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fopen.demonii.com:%3A1337%2Fannounce"
+            #print "===> link:", link
+            #print "===> params:", self.params
+            #print torrent_info
+            
+            ## TODO: Set up multiple torrents at the same time
+            link = torrent_info[0]['magnet']
+            
+            ## Preparting torrent downloading
             self.handle = lt.add_magnet_uri(self.ses, link, self.params)
             
             rospy.loginfo('     Downloading metadata...')
@@ -108,7 +121,7 @@ class TorrentDownloader(object):
             self.handle.set_max_connections(self.max_connections)
             
             ## Moving to next state
-            self.download()
+            self.download(torrent_info=torrent_info)
         except Exception as inst:
               ros_node.ParseException(inst)
               
