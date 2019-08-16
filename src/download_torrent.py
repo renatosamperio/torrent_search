@@ -701,11 +701,17 @@ class DownloadTorrent(ros_node.RosNode):
                 ## Wait for being notified that a message
                 ##    has arrived
                 with self.condition:
-                    rospy.logdebug('  Waiting for message...')
+                    rospy.logdebug('  Waiting for message in state -> [%s]'%self.downloader.fsm.state)
                     self.condition.wait()
                 
                 with self.lock:
                     (topic, msg) = self.queue.get()
+                
+                if self.downloader.fsm.state != 'Start':
+                    rospy.logwarn('Current state is ready to start, is [%s]'%self.downloader.fsm.state)
+                    continue
+                else:
+                    rospy.loginfo('Current state -> [%s]'%self.downloader.fsm.state)
                     
                 args = {}
                 if 'move_state' in topic:
@@ -714,16 +720,14 @@ class DownloadTorrent(ros_node.RosNode):
                 else:
                     
                     ## Get best magnet to download
-                    torrent_info = self.downloader.choose_magnet(msg, topic)
-                    if len(torrent_info) < 1 or torrent_info is None:
-                        rospy.logwarn('Invalid torrent data provided')
-                        return
-                    
+                    ## Making ROS message into a dictionary
+                    msg = json.loads(rj.convert_ros_message_to_json(msg) )
+                    msg = self.downloader.make_magnet(msg, topic)
+                    return
+
                     ## Preparing state transition with input data
-                    args = {
-                        'torrent_info': torrent_info
-                    }
-                    
+                    args = {'info': msg}
+
                     ## Going to next state
                     self.downloader.next('configure', **args)
 
