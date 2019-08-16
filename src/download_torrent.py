@@ -354,29 +354,133 @@ class TorrentDownloader(object):
         except Exception as inst:
               ros_node.ParseException(inst)
 
-    def update_db_state(self, torrent_info):
+    def remove_torrents(self):
         try:
-            ## Accessing DB elemnt with ID
-            for torrent in torrent_info:
-                target_state = 'downloading'
-                rospy.logdebug("  Updating to [%s] state for %d/%s"%
-                               (target_state, torrent['id'], torrent['title']))
-                query = {'id': torrent['id']}
-                posts = self.db_handler.Find(query)
-                for element in posts:
-                    pprint(element)
-                    print "-"*10
-                    
+            i = 0
+            while i < len(self.chosen_torrents):
+                torrent_state = self.chosen_torrents[i]
+                
                 ## Updating current torrent history and state
-                # 'hs_state': {u'history': [], u'status': u'created'}
-                    substitute = element['hs_state']
-                    substitute['status'] = target_state
-                    substitute['history'].append({
-                        'last_update': rospy.Time.now().to_sec(),
-                        'operation': ,
-                    })
-                    pprint(substitute)
-                    #updated_was_ok = self.db_handler.Update(query, substitute)
+                for torrent in  torrent_state['torrents']:
+
+                    ## Remove from local memory any finished torrent
+                    if 'state' in torrent.keys() and torrent['state']['status'] == 'finished':
+                        del self.chosen_torrents[i]
+                        break
+                i += 1
+
+        except Exception as inst:
+            ros_node.ParseException(inst)
+
+    def update_db_state(self, hash, target_state, debug_=False):
+        def has_state_in_history(state, history):
+            try:
+                for item in history:
+                    if item['operation'] == state:
+                        return False
+                
+                return True
+            except Exception as inst:
+                ros_node.ParseException(inst)
+        
+        try:
+            if len(target_state)<1:
+                rospy.logwarn('Not possible to update DB, invalid target')
+                return
+            
+            ## Getting specific torrent thta will be update in DB
+            rospy.logdebug("  Let's update DB [%s] state for %s"%(target_state, hash))
+            
+            query = { 
+                "torrents": { 
+                    '$elemMatch': { 
+                        'hash': hash
+                    } 
+                }
+            }
+            
+            posts = self.db_handler.Find(query)
+            for element in posts:
+            
+                ## Updating current torrent history and state
+                for i in range(len( element['torrents'])):
+                    
+                    ## We start to look for an specific hash
+                    if element['torrents'][i]['hash'] != hash:
+                        continue
+                        
+                    ## 1) Update state in DB
+                    ## Create state in DB record
+                    new_state = set_history(target_state)
+                    if 'state' not in element['torrents'][i].keys():
+                        rospy.logdebug('  Creating [%s] state DB state for [%s]'%(target_state, hash))
+                        state = {
+                            'state': {
+                                'status': target_state,
+                                'history': [new_state]
+                            }
+                        }
+                        element['torrents'][i].update(state)
+                        rospy.loginfo('  Created new DB state [%s] for [%s]'%
+                                      (target_state, element['id']))
+                        updated_was_ok = self.db_handler.Update(query, element)
+                    elif has_state_in_history(target_state, element['torrents'][i]['state']['history']):
+                            
+                        ## Updated new status in already defined state
+                        rospy.logdebug('  Updated state [%s] DB state for [%s]'%(target_state, hash))
+                        element['torrents'][i]['state']['status'] = target_state
+                        element['torrents'][i]['state']['history'].append( new_state )
+
+                        ## Update state according to existing hash
+                        query = {'id': element['id']}
+                        rospy.loginfo('  Updating DB state [%s] for [%s]'%
+                                      (target_state, element['id']))
+                        updated_was_ok = self.db_handler.Update(query, element)
+                        label = 'updated successfully' if updated_was_ok else 'was not updated'
+                        rospy.logdebug('    DB record [%s] %s'%(hash, label) )
+                        
+                    else:
+                        rospy.logdebug('    Queried DB state [%s] is already defined for item [%s]'%
+                                      (target_state, hash))
+                        
+
+                    ## 2) Update state in a local copy
+                    ## Creating local state if it would not exist
+                    item_not_found = True 
+                    for torrent_state in self.chosen_torrents:
+                        if 'id' in torrent_state.keys() and torrent_state['id'] == element['id']:
+                            rospy.logdebug("  Item with ID [%s] is already in local copy"%element['id'])
+                            item_not_found = False
+                            break
+                    if item_not_found:
+                        rospy.logdebug("  No local copy of torrents for [%s]"%hash)
+                        self.chosen_torrents.append(element)
+                    
+                    if debug_: pprint(element)
+
+            #pprint(self.chosen_torrents)
+            ## Updating local state
+            rospy.logdebug("  Let's update local [%s] state for [%s]"%(target_state, hash))
+            for i in range(len(self.chosen_torrents)):
+                torrent_state = self.chosen_torrents[i]
+                
+                ## Updating current torrent history and state
+                for torrent in  torrent_state['torrents']:
+                    if torrent['hash'] == hash:
+                        if torrent['state']['status'] != target_state:
+#                             
+                            torrent['state']['status'] = target_state
+                            torrent['state']['history'].append( set_history(target_state) )
+                            rospy.logdebug('    Updated local state [%s] updated for [%s]'%(target_state, hash))
+                        else:
+                            rospy.logdebug('    Local state [%s] already updated for [%s]'%
+                                           (target_state, hash))
+                        break
+                    
+            ## Remove finished torrents from local memory
+            if target_state == 'finished':
+                self.remove_torrents()
+
         except Exception as inst:
               ros_node.ParseException(inst)
         
