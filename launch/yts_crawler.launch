@@ -1,0 +1,4 @@
+<launch>
+  <node name="yts_crawler" pkg="torrent_search" type="yts_crawler.py" output="log"/>
+
+</launch>

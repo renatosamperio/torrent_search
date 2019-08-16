@@ -1,0 +1,4 @@
+<launch>
+  <node name="yts_finder" pkg="torrent_search" type="yts_finder.py" args="--debug" output="log"/>
+
+</launch>
