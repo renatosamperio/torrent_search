@@ -55,6 +55,8 @@ class YtsRecords(object):
               ros_node.ParseException(inst)
 
     def search_not_finished_torrents(self, options):
+        ## TODO: Return finished torrents?
+        ## TODO: Use multiple criteria for startin to download? -> Make more methods with different queries each one
         try:
             configured_options = options.keys()
             query = {}
@@ -114,6 +116,8 @@ class YtsRecords(object):
                 del parsable_item['torrents']
                 del parsable_item['hs_state']
                 
+                ## BUGFIX: Check why torrents is not contained and throws an error
+                
                 ## Paring item without nested structures
                 parsable_item = utilities.convert_to_str(parsable_item)
                 yts_torrent_info = mc.convert_dictionary_to_ros_message(
@@ -149,8 +153,10 @@ class YtsRecords(object):
         finally:
             return ros_msg
 
-    def get_magnet(self, torrent_info): #torrent_hash, encoded_movie_name):
+    def get_magnet(self, torrent_info): 
         try:
+            
+            ## TODO: If magnet already exists do not call it again!
             encoded_movie_name = torrent_info.title_long
             trackers = "tr=udp%3A%2F%2Fglotorrents.pw%3A6969%2Fannounce&" + \
             "tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80&" + \
@@ -216,6 +222,8 @@ class YtsFinder(ros_node.RosNode):
     def ShutdownCallback(self):
         try:
             rospy.logdebug('+ Shutdown: Doing nothing...')
+            
+            ##TODO: Update torrent state whenver program is shutting down
         except Exception as inst:
               ros_node.ParseException(inst)
               
