@@ -58,8 +58,12 @@ class YtsRequests(object):
                 item        = items[i]
                 item_id     = item['id']
                 condition   = {'id': item_id}
+                
+                ## Look if item by ID if it already exists
                 posts       = self.db_handler.Find(condition)
                 if posts.count() < 1:
+                    
+                    ## Adding general torrent state
                     rospy.logdebug('  Adding state element to item')
                     item.update({
                         'hs_state': {
@@ -68,6 +72,10 @@ class YtsRequests(object):
 
                         }
                     })
+                    
+                    ## Adding state per given torrent
+                    for torrent in item['torrents']:
+                        torrent.update({'state':{ 'status':'', 'history': []}})
                     
                     rospy.logdebug("Torrent item [%d] not found"%(item_id))
                     post_id = self.db_handler.Insert(item)
@@ -116,6 +124,7 @@ class YtsRequests(object):
                     ##Update new item
                     result = self.db_handler.Update(condition, new_item)
                     rospy.loginfo("  Updated item [%d] %s"%(item_id, info_label))
+                    
 
         except Exception as inst:
               ros_node.ParseException(inst)
