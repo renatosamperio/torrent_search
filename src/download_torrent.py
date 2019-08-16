@@ -223,9 +223,9 @@ class TorrentDownloader(object):
         except Exception as inst:
               ros_node.ParseException(inst)
 
-    def reset_downloader(self): 
+    def reset_download(self): 
         try:
-            rospy.logwarn('---> Resetting downloader...')
+            rospy.logdebug('---> Resetting download ['+self.previous_state+'] -> ['+self.state+']')
         except Exception as inst:
               ros_node.ParseException(inst)
 
