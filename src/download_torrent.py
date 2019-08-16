@@ -60,15 +60,16 @@ class TorrentDownloader(object):
             ]
             
             rospy.logdebug('Starting torrent session')
-            self.ses = lt.session()
-            self.handle = None
-            self.status = None
-            self.not_complete = True
-            self.close_now = True
-            self.download_started = False
-            self.previous_state = 'None'
-            self.database = None
-            self.collection = None
+            self.ses                = lt.session()
+            self.chosen_torrents    = []
+            self.handle             = None
+            self.status             = None
+            self.not_complete       = True
+            self.close_now          = True
+            self.download_started   = False
+            self.previous_state     = 'None'
+            self.database           = None
+            self.collection         = None
             
             ## Parsing arguments
             for key, value in kwargs.iteritems():
