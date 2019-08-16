@@ -509,16 +509,18 @@ class DownloaderFSM:
             # And some transitions between states. We're lazy, so we'll leave out
             # the inverse phase transitions (freezing, condensation, etc.).
             self.transitions = [
-                { 'trigger': 'configure',           'source': 'Start',          'dest': 'Setup' },
-                { 'trigger': 'download',            'source': 'Setup',          'dest': 'Downloading' },
-                { 'trigger': 'done',                'source': 'Downloading',    'dest': 'Finished' },
-                { 'trigger': 'pause',               'source': 'Downloading',    'dest': 'Paused' },
-                { 'trigger': 'unpause',             'source': 'Paused',         'dest': 'Downloading' },
-                { 'trigger': 'reset',               'source': 'Finished',       'dest': 'Start' },
-                { 'trigger': 'fail_setup',          'source': 'Setup',          'dest': 'Error' },
-                { 'trigger': 'failed_downloading',  'source': 'Downloading',    'dest': 'Error' },
-                { 'trigger': 'failed_pause',        'source': 'Paused',         'dest': 'Error' },
-                { 'trigger': 'failed_closing',      'source': 'Finished',       'dest': 'Error' }
+                { 'trigger': 'configure',   'source': 'Start',          'dest': 'Setup' },
+                { 'trigger': 'download',    'source': 'Setup',          'dest': 'Downloading' },
+                { 'trigger': 'done',        'source': 'Downloading',    'dest': 'Finished' },
+                { 'trigger': 'pause',       'source': 'Downloading',    'dest': 'Paused' },
+                { 'trigger': 'unpause',     'source': 'Paused',         'dest': 'Downloading' },
+                { 'trigger': 'restart',     'source': 'Finished',       'dest': 'Start' },
+                { 'trigger': 'fail',        'source': 'Start',          'dest': 'Error' },
+                { 'trigger': 'fail',        'source': 'Setup',          'dest': 'Error' },
+                { 'trigger': 'fail',        'source': 'Downloading',    'dest': 'Error' },
+                { 'trigger': 'fail',        'source': 'Paused',         'dest': 'Error' },
+                { 'trigger': 'fail',        'source': 'Finished',       'dest': 'Error' },
+                { 'trigger': 'reset',       'source': 'Error',          'dest': 'Start' }
             ]
             
             # Initialize
