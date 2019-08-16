@@ -1,0 +1,15 @@
+#!/bin/bash
+
+## Loading logger
+export HS_HOME=/opt/home_services/src/home_services
+source $HS_HOME/src/hs_utils/setup/hs_bash_logs.bash
+
+# Sourcing ROS environment
+export ROS_LOG_DIR=/opt/home_services/data/logs
+export HS_HOME=/opt/home_services/src/home_services
+source $HS_HOME/devel/setup.bash
+
+# Starting band search
+info "Starting yts finder"
+roslaunch torrent_search yts_finder.launch
+

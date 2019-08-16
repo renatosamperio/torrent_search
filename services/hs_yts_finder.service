@@ -1,0 +1,14 @@
+[Unit]
+Description=HS Searches in YTS local records
+Requires=network-online.target
+After=network.target
+
+[Service]
+User = base
+Group = adm
+Type=simple
+ExecStart=/usr/local/bin/hs_yts_finder
+Restart=always
+
+[Install]
+WantedBy=hs_torrent_search.target
