@@ -530,20 +530,20 @@ class DownloaderFSM:
                                    transitions=self.transitions, 
                                    initial='Start')
             
-            self.machine.on_enter_Setup('set_up_configuration')
-            self.machine.on_enter_Downloading('start_downloading')
-            self.machine.on_enter_Finished('close_torrent')
-            self.machine.on_enter_Paused('pausing_download')
-            self.machine.on_exit_Paused('restore_download')
-            self.machine.on_exit_Paused('reset_downloader')
+            self.machine.on_enter_Setup         ('set_up_configuration')
+            self.machine.on_enter_Downloading   ('start_downloading')
+            self.machine.on_enter_Finished      ('close_torrent')
+            self.machine.on_enter_Paused        ('pausing_download')
+            self.machine.on_exit_Paused         ('restore_download')
+            self.machine.on_exit_Error          ('reset_error')
+            self.machine.on_enter_Error         ('failed_transition')
+            #self.machine.on_exit_Finished       ('reset_download')
             
         except Exception as inst:
               ros_node.ParseException(inst)
 
     def next(self, next_state, **args):
         try:
-            #print "===> next_state", next_state
-            #print "===> args", args
             ## Keeping previous state
             self.fsm.previous_state = self.fsm.state
             rospy.logdebug('Previous state: '+self.fsm.previous_state)
