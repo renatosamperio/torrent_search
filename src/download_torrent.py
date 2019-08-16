@@ -277,50 +277,80 @@ class TorrentDownloader(object):
     def downloader_thread(self, event):
         ''' Run method '''
         try:
-            while (not self.status.is_seeding and self.not_complete):
+            ## FSM transition status
+            rospy.logdebug('---> Downloading ['+self.previous_state+'] -> ['+self.state+']')
+
+            rospy.logdebug('  Updating downloading status for all handlers')
+            handles = self.ses.get_torrents()
+            for handle in handles:
+                status = handle.status()
+                hash = str(status.info_hash).upper()
+                self.update_db_state(hash, 'downloading')
+
+            handles = self.ses.get_torrents()
+            while len(handles)>0:
                 if self.state == 'Paused':
                     with self.fsm_condition:
                         rospy.loginfo('  Download has been halted')
                         self.fsm_condition.wait()
-
-                self.status = self.handle.status()
                 
-                #rospy.logdebug('['+self.previous_state+'] -> ['+self.state+']')
-                progress        = self.status.progress * 100.0
-                download_rate   = self.status.download_rate / 1000
-                upload_rate     = self.status.upload_rate / 1000
-                num_peers       = self.status.num_peers
-                state           = self.state_str[self.status.state]
-                previous_state  = self.previous_state
-                current_state   = self.state
+                ## Looking for each handle
+                handles = self.ses.get_torrents()
                 
-                rospy.loginfo(' %.2f%% complete (down: %.1f kb/s, up: %.1f kB/s, peers: %d) %s: [%s] -> [%s]'% (
-                    progress, 
-                    download_rate, 
-                    upload_rate, 
-                    num_peers, 
-                    state,
-                    previous_state,
-                    current_state
-                ))
+                ## Maximum rate limited to 10 items per second
+                num_handles = len(handles)
+                num_handles = 10 if num_handles >10 else num_handles
                 
-                if not self.close_now:
-                    print "===> CLOSING"
-                    break
+                ## Look for each torrent
+                for i in range(len(handles)):
+                    rate            = rospy.Rate(10)
+                    handle          = handles[i]
+                    status          = handle.status()
+                    handle_name     = handle.name()
+                    
+                    ## Logging data
+                    progress        = status.progress * 100.0
+                    download_rate   = status.download_rate / 1000
+                    upload_rate     = status.upload_rate / 1000
+                    num_peers       = status.num_peers
+                    state           = self.state_str[status.state]
+                    previous_state  = self.previous_state
+                    current_state   = self.state
+                    torrent_hash    = str(status.info_hash).upper()
+                    
+                    rospy.loginfo('[%s] %.2f%% complete (down: %.1f kb/s, up: %.1f kB/s, peers: %d) %s: [%s] -> [%s]'% (
+                        handle_name,
+                        progress, 
+                        download_rate, 
+                        upload_rate, 
+                        num_peers, 
+                        state,
+                        previous_state,
+                        current_state
+                    ))
+                    
+                    ## Remove torrent if it is already finished, 
+                    ##    otherwise keep pulling for state
+                    if status.is_seeding and status.is_finished:
+                        rospy.loginfo('[%s] has just finished'%handle_name)
+                        
+                        ## Removing handle from session
+                        self.ses.remove_torrent(handle)
+                        rospy.loginfo('Removing handle [%s] from session'%handle_name)
+                        
+                        ## Update state in DB
+                        self.update_db_state(torrent_hash, 'finished')
+                    
+                    else:
+                        rate.sleep()
             
-                if self.status.progress  >= 1.0:
-                    self.not_complete = False
-                    print "===> FALSE"
-                else:
-                    time.sleep(1)
-            
-#                     print "===> not_complete:", self.not_complete
-#                     print "===> status.is_seeding:", self.status.is_seeding
-#                     print "===> status:", self.status_seeding
-
             ## Moving to next state
-            print "Download finished"
+            rospy.loginfo( "Download(s) finished")
+            
+            ## Resetting download state
+            self.download_started = False
             self.done()
+            return
         except Exception as inst:
               ros_node.ParseException(inst)
 
