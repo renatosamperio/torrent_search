@@ -229,6 +229,51 @@ class TorrentDownloader(object):
         except Exception as inst:
               ros_node.ParseException(inst)
 
+    def failed_transition(self): 
+        try:
+            rospy.logdebug('---> Failed transition ['+self.previous_state+'] -> ['+self.state+']')
+            self.previous_state = self.state
+            self.reset()
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
+    def reset_error(self): 
+        try:
+            self.previous_state = self.state
+            rospy.logdebug('---> Recovering from error ['+self.previous_state+']')
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
+    def print_info(self, handle):
+        try:
+        
+            status          = handle.status()
+            handle_name     = handle.name()
+            print "===> handle_name:", handle_name
+            print "===> status.info_hash:", status.info_hash
+            print "===> status.progress:", status.progress
+            print "===> status.is_finished:", status.is_finished
+            print "===> status.is_seeding:", status.is_seeding
+            print ""
+            print "===> status.total_download:", status.total_download
+            print "===> status.total_payload_download:", status.total_payload_download
+            print "===> status.total_done:", status.total_done
+            print "===> status.total_wanted_done:", status.total_wanted_done
+            print "===> status.total_wanted:", status.total_wanted
+            print ""
+            print "===> status.progress:", status.progress
+            print "===> status.finished_time:", status.finished_time
+            print "===> status.active_time:", status.active_time
+            print "===> status.seeding_time:", status.seeding_time
+            print "===> status.progress_ppm:", status.progress_ppm
+            print ""
+            print "===> COND:",  status.is_seeding and status.is_finished
+            print "===> status.state:", self.state_str[status.state]
+            print "===> "*5
+    
+        except Exception as inst:
+            ros_node.ParseException(inst)
+
     def downloader_thread(self, event):
         ''' Run method '''
         try:
