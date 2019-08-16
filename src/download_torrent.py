@@ -185,9 +185,9 @@ class TorrentDownloader(object):
               
     def close_torrent(self): 
         try:
-            rospy.logdebug('---> Closing torrent')
+            rospy.logdebug('---> Closing torrent ['+self.previous_state+'] -> ['+self.state+']')
             self.download_started = False
-            self.reset()
+            self.restart()
         except Exception as inst:
               ros_node.ParseException(inst)
               
