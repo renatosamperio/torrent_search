@@ -8,6 +8,13 @@ state: 'configure'" -1;
 
 rostopic pub /download_torrent/move_state torrent_search/State "header: auto
 state: 'pause'" -1; 
+
+DB Query
+db.torrents.find( { "torrents": { $elemMatch: { hash: "97F58867E989E0DA30CFC56522B08A01646F27D1"} } } )
+db.torrents.find( { "torrents": { $elemMatch: { hash: "97f58867e989e0da30cfc56522b08a01646f27d1".toUpperCase() } } } ).pretty()
+
+db.copyDatabase("yts_12112019", "yts")
+
 '''
 
 import sys, os
@@ -22,13 +29,22 @@ import copy
 from optparse import OptionParser, OptionGroup
 from pprint import pprint
 
-from hs_utils import ros_node, logging_utils
+from hs_utils import ros_node, logging_utils, utilities
 from hs_utils.mongo_handler import MongoAccess
+from hs_utils import json_message_converter as rj
 from torrent_search.msg import State
 from torrent_search.msg import YtsTorrents
 
 from transitions import Machine
 import libtorrent as lt
+from __builtin__ import True
+from future.backports.test.pystone import TRUE
+
+def set_history(operation):
+    try:
+        return {'operation': operation, 'last_update': time.time()}
+    except Exception as inst:
+        ros_node.ParseException(inst)
 
 class TorrentDownloader(object):
     def __init__(self, **kwargs):
