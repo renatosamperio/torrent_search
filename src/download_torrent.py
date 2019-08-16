@@ -576,51 +576,70 @@ class DownloaderFSM:
         except Exception as inst:
               ros_node.ParseException(inst)
 
-    def choose_magnet(self, msg, topic):
-        torrent_info = []
+    def make_magnet(self, msg, topic):
+        ### torrent_info = []
         try:
             rospy.loginfo('Getting magnet to download')
             ## Get best magnet to download
             if 'found_torrents' not in topic:
                 return msg.magnet
             
-            #pprint(msg)
-            torrent_template = {
-                'magnet' : '',
-                'id': '',
-                'title': ''
-            }
-            for i in range(len(msg.torrent_items)):
+            ## Look for maximum seeds
+            for i in range(len(msg['torrent_items'])):
                 
                 ## Initialising list with empty magnets
-                item = msg.torrent_items[i]
-                torrent_info.append( copy.copy(torrent_template) )
+                item = msg['torrent_items'][i]
+                
+                ## Checking current torrent status
+                if self.fsm.is_torrent_finished(item):
+                    rospy.loginfo("[%s] has been already downloaded"%item['title_long'])
+                    #pprint(item)
+                    continue
                 
                 ## Looking into best match to download
-                rospy.logdebug('Looking torrents of [%s]'%item.title_long)
-                max_seeds = -1
-                for torrent in item.torrents:
+                rospy.logdebug('Looking torrents of [%s]'%item['title_long'])
+                max_seeds       = -1
+                chosen_index    = -1
+                for j in  range(len(item['torrents'])):
+                    torrent     = item['torrents'][j]
                     
                     ## Get manget based on amount of seeds
-                    if torrent.seeds > max_seeds:
-                        max_seeds = torrent.seeds
-                        torrent_info[i]['magnet']   = torrent.magnet
-                        torrent_info[i]['id']       = item.id
-                        torrent_info[i]['title']    = item.title_long
+                    if torrent['seeds'] > max_seeds:
+                        max_seeds       = torrent['seeds']
+                        chosen_index    = j
                         
-                        rospy.loginfo('Getting [%s] for %s-%s of %s with %d/%d'%
-                                      (item.title_long, torrent.type, 
-                                       torrent.quality, torrent.size,
-                                       torrent.seeds, torrent.peers))
+                        ### torrent_info[i]['magnet']   = torrent.magnet
+                        ### torrent_info[i]['id']       = item.id
+                        ### torrent_info[i]['title']    = item.title_long
                         
-                    ## TODO: Make rules to download
-                    ##        - Quality
-                    ##        - Does it has seeds/peers?
-                    ##        - Has it been already downloaded?
+                        rospy.logdebug('Looking for [%s] for %s-%s of %s with %d/%d'%
+                                      (item['title_long'], torrent['type'], 
+                                       torrent['quality'], torrent['size'],
+                                       torrent['seeds'], torrent['peers']))
+                
+                ## Set selected torrent based in highest amount of seeds
+                operation = 'selected'
+                item['torrents'][chosen_index]['state']['status'] = operation
+                item['torrents'][chosen_index]['state']['history'].append(set_history(operation))
+                selected = item['torrents'][chosen_index]
+                rospy.loginfo('Choosing [%s] for %s-%s of %s with %d/%d'%
+                              (item['title_long'], selected['type'], 
+                               selected['quality'], selected['size'],
+                               selected['seeds'], selected['peers']))
+                
+                ## Should we update a selected state in this scope?
+                self.fsm.update_db_state(selected['hash'], operation)
+#                 print "$-"*20
+#                 pprint(selected)
+                
+                ## TODO: Make rules to download
+                ##        - Quality
+                ##        - Does it has seeds/peers?
+                ##        - Has it been already downloaded?
         except Exception as inst:
               ros_node.ParseException(inst)
         finally:
-            return torrent_info
+            return msg
             
 class DownloadTorrent(ros_node.RosNode):
     def __init__(self, **kwargs):
