@@ -483,7 +483,23 @@ class TorrentDownloader(object):
 
         except Exception as inst:
               ros_node.ParseException(inst)
-        
+
+    def is_torrent_finished(self, torrent_info):
+        try:
+            ## Looking if torrent has any downloaded file
+            query = { "id": torrent_info['id'] }
+            posts = self.db_handler.Find(query)
+            for element in posts:
+                for torrent in element['torrents']:
+                    
+                    ## Find finished downloaded torrents
+                    if 'state' in torrent.keys() and torrent['state']['status'] == 'finished':
+                        return True
+
+            return False
+        except Exception as inst:
+              ros_node.ParseException(inst)
+            
 class DownloaderFSM:
     def __init__(self, **kwargs):
         try:
