@@ -46,9 +46,150 @@ def set_history(operation):
     except Exception as inst:
         ros_node.ParseException(inst)
 
-class TorrentDownloader(object):
+class Alarm:
     def __init__(self, **kwargs):
         try:
+            ## Class variables
+            self.started_coincidence_counter    = None
+            self.is_finished                    = False
+            self.download_time                  = 0 #s
+            self.download_pause                 = 0 #s
+            
+            ## Client callbacks
+            self.client_stop_downloading        = None
+            self.client_stop_pausing            = None
+            
+            ## timer
+            self.elapsed_time                   = 0.0
+            self.start_time                     = 0.0
+            
+            ## Parsing arguments
+            for key, value in kwargs.iteritems():
+                if "download_time" == key:
+                    self.download_time = value
+                elif "download_pause" == key:
+                    self.download_pause = value
+                elif "client_stop_downloading" == key:
+                    self.client_stop_downloading = value
+                elif "client_stop_pausing" == key:
+                    self.client_stop_pausing = value
+            
+            rospy.loginfo('ALARM: Created alarm object')
+        except Exception as inst:
+              ros_node.ParseException(inst)
+              
+    def start(self):
+        try:
+            
+            self.is_finished = False
+            rospy.logdebug('ALARM: Calling alarm timer')
+            ## Executioning thread
+            if not self.is_finished:
+                rospy.Timer(rospy.Duration(0.5), self.download_timer, oneshot=True)
+        except Exception as inst:
+              ros_node.ParseException(inst)
+              
+    def stop(self):
+        try:
+            ## Executioning thread
+            if not self.is_finished:
+                rospy.Timer(rospy.Duration(0.5), self.pause_timer, oneshot=True)
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
+    def download_timer(self, event):
+        try:
+            self.start_time = time.time()
+            rate = rospy.Rate(4)
+            rospy.logdebug('ALARM: Starting download alarm for %2.4fs'%self.download_time)
+            while not rospy.is_shutdown() and not self.is_finished:
+                rate.sleep();
+                
+                self.elapsed_time = time.time() - self.start_time
+                
+                #print "===>download elapsed_time:", self.elapsed_time
+                if self.elapsed_time> self.download_time:
+                    break
+            rospy.logdebug('ALARM: Stopped download timer after: %2.4fs'%self.elapsed_time)
+            
+            ## Calling client callback
+            if self.client_stop_downloading is not None:
+                self.client_stop_downloading()
+            
+            ## Looping into pause timer
+            self.stop()
+        except Exception as inst:
+              ros_node.ParseException(inst)
+              
+    def pause_timer(self, event):
+        try:
+            self.start_time = time.time()
+            rate = rospy.Rate(4)
+            rospy.logdebug('ALARM: Starting pause alarm for %2.4fs'%self.download_time)
+            while not rospy.is_shutdown() and not self.is_finished:
+                rate.sleep();
+
+                self.elapsed_time = time.time() - self.start_time
+                #print "===>pause elapsed_time:", self.elapsed_time
+                if self.elapsed_time> self.download_pause:
+                    self.download_timer_running = False
+                    break
+            rospy.logdebug('ALARM: Stopped pause timer after: %2.4fs'%self.elapsed_time)
+            
+            ## Calling client callback
+            if self.client_stop_pausing is not None:
+                self.client_stop_pausing()
+            
+            ## Looping into pause timer
+            self.start()
+        except Exception as inst:
+              ros_node.ParseException(inst)
+        
+    def has_finished(self):
+        try:
+            self.is_finished = True
+            rospy.logdebug('ALARM: Setting alarm to be finished')
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
+class Downloader(object):
+    def __init__(self, **kwargs):
+        try:
+            ## Automatic start and stop
+            seconds_per_hour        = 3600
+            self.download_time      = 0.5* seconds_per_hour #s
+            self.download_pause     = 12.0*seconds_per_hour #s
+            rospy.logdebug('Starting alarm')
+            args = {
+                'download_time':            self.download_time,
+                'download_pause':           self.download_pause,
+                'client_stop_downloading':  self.client_stop_downloading,
+                'client_stop_pausing':      self.client_stop_pausing
+            }
+            self.alarm = Alarm(**args)
+            
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
+    def client_stop_pausing(self):
+        try:
+            rospy.loginfo('client_stop_pausing: nothing to do')
+            self.unpause()
+        except Exception as inst:
+              ros_node.ParseException(inst)
+              
+    def client_stop_downloading(self):
+        try:
+            rospy.loginfo('client_stop_downloading, nothing to do')
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
+class TorrentDownloader(Downloader):
+    def __init__(self, **kwargs):
+        try:
+            
+            super(TorrentDownloader, self).__init__()
+
             self.state_str = [
                     'queued', 
                     'checking', 
