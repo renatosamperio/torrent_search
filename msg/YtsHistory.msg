@@ -1,2 +1,2 @@
-string last_update
-string operation
+float64 last_update
+string  operation
