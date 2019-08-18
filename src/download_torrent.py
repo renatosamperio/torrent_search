@@ -765,7 +765,7 @@ if __name__ == '__main__':
     setup_opts.add_option('--save_path',
                 type="string",
                 action='store',
-                default='/opt/data/tmp',
+                default='/opt/data/movies',
                 help='Path to downloaded items')
     setup_opts.add_option('--up_limit',
                 type="int",
