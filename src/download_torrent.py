@@ -322,7 +322,7 @@ class TorrentDownloader(object):
                     current_state   = self.state
                     torrent_hash    = str(status.info_hash).upper()
                     
-                    rospy.loginfo('[%s] %.2f%% complete (down: %.1f kb/s, up: %.1f kB/s, peers: %d) %s: [%s] -> [%s]'% (
+                    rospy.loginfo_throttle(5, '[%s] %.2f%% complete (down: %.1f kb/s, up: %.1f kB/s, peers: %d) %s: [%s] -> [%s]'% (
                         handle_name,
                         progress, 
                         download_rate, 
