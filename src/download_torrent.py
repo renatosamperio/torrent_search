@@ -233,12 +233,6 @@ class TorrentDownloader(object):
         except Exception as inst:
               ros_node.ParseException(inst)
 
-    def reset_download(self): 
-        try:
-            rospy.logdebug('---> Resetting download ['+self.previous_state+'] -> ['+self.state+']')
-        except Exception as inst:
-              ros_node.ParseException(inst)
-
     def failed_transition(self): 
         try:
             rospy.logdebug('---> Failed transition ['+self.previous_state+'] -> ['+self.state+']')
@@ -547,7 +541,6 @@ class DownloaderFSM:
             self.machine.on_exit_Paused         ('restore_download')
             self.machine.on_exit_Error          ('reset_error')
             self.machine.on_enter_Error         ('failed_transition')
-            #self.machine.on_exit_Finished       ('reset_download')
             
         except Exception as inst:
               ros_node.ParseException(inst)
