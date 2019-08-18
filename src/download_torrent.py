@@ -647,7 +647,21 @@ class TorrentDownloader(Downloader):
             return False
         except Exception as inst:
               ros_node.ParseException(inst)
-            
+
+    def client_stop_pausing(self):
+        try:
+            rospy.loginfo('Re-starting torrents download')
+            self.unpause()
+        except Exception as inst:
+              ros_node.ParseException(inst)
+              
+    def client_stop_downloading(self):
+        try:
+            rospy.loginfo('Pausing torrents download')
+            self.pause()
+        except Exception as inst:
+              ros_node.ParseException(inst)
+                   
 class DownloaderFSM:
     def __init__(self, **kwargs):
         try:
