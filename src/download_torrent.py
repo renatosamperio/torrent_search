@@ -139,7 +139,7 @@ class TorrentDownloader(object):
                         start_time = time.time()
                         metadata_ready = True
                         metadata_expired = True
-                        while (not handle.has_metadata() and self.close_now and metadata_expired): 
+                        while (not handle.has_metadata() and metadata_expired): 
                             time.sleep(0.5)
                             metadata_expired = (time.time() - start_time) <= 60
                             #print "===> metadata_expired:", metadata_expired, self.handle.has_metadata()
@@ -581,8 +581,7 @@ class DownloaderFSM:
     
     def close(self):
         try:
-            self.fsm.close_now = False
-            print "-", self.fsm.close_now
+            rospy.loginfo('Doing nothing to close')
         except Exception as inst:
               ros_node.ParseException(inst)
 
