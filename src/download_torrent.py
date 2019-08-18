@@ -295,24 +295,20 @@ class TorrentDownloader(Downloader):
                         handle.set_max_connections(self.max_connections)
                         
             ## Moving to next state
-            self.download(torrent_info=torrent['torrent_items'])
+            self.download()
             
         except Exception as inst:
             ros_node.ParseException(inst)
             self.fail()
-              
-    def start_downloading(self, torrent_info=None): 
+     
+    def start_downloading(self): 
         try:
-            if torrent_info is None:
-                rospy.logwarn ('Downloading torrent failed as no torrent info was provided')
-                ## TODO: Send it to error state?
-                return
-            
+            ## Validating current FSM state
             if not self.is_Downloading():
                 self.failed_downloading()
             else:
                 ## Verify is session isn't already downloading stuff...
-                print "===> session is_listening?", self.ses.is_listening()
+                #print "===> session is_listening?", self.ses.is_listening()
                 if not self.download_started:
                     self.download_started = True
                     rospy.logdebug('---> Starting to download ['+self.previous_state+'] -> ['+self.state+']')
@@ -772,8 +768,6 @@ class DownloaderFSM:
                 
                 ## Should we update a selected state in this scope?
                 self.fsm.update_db_state(selected['hash'], operation)
-#                 print "$-"*20
-#                 pprint(selected)
                 
                 ## TODO: Make rules to download
                 ##        - Quality
