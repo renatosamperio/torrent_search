@@ -723,7 +723,6 @@ class DownloadTorrent(ros_node.RosNode):
                     ## Making ROS message into a dictionary
                     msg = json.loads(rj.convert_ros_message_to_json(msg) )
                     msg = self.downloader.make_magnet(msg, topic)
-                    return
 
                     ## Preparing state transition with input data
                     args = {'info': msg}
