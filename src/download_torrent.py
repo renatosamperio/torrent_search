@@ -103,6 +103,16 @@ class TorrentDownloader(object):
         except Exception as inst:
               ros_node.ParseException(inst)
 
+    def get_state_str(self, state): 
+        try:
+            if state < len(self.state_str):
+                return self.state_str[state]
+            else:
+                rospy.logdebug('Unrecognised state: '+str(state) )
+                return str(state)
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
     def set_up_configuration(self, torrent=None): 
         try:
             if torrent is None:
@@ -268,7 +278,7 @@ class TorrentDownloader(object):
             print "===> status.progress_ppm:", status.progress_ppm
             print ""
             print "===> COND:",  status.is_seeding and status.is_finished
-            print "===> status.state:", self.state_str[status.state]
+            print "===> status.state:", self.get_state_str(status.state)
             print "===> "*5
     
         except Exception as inst:
@@ -313,7 +323,7 @@ class TorrentDownloader(object):
                     download_rate   = status.download_rate / 1000
                     upload_rate     = status.upload_rate / 1000
                     num_peers       = status.num_peers
-                    state           = self.state_str[status.state]
+                    state           = self.get_state_str(status.state)
                     previous_state  = self.previous_state
                     current_state   = self.state
                     torrent_hash    = str(status.info_hash).upper()
