@@ -427,6 +427,9 @@ class TorrentDownloader(Downloader):
                 status = handle.status()
                 hash = str(status.info_hash).upper()
                 self.update_db_state(hash, 'downloading')
+                
+            ## Starting timed download alarm
+            self.alarm.start()
 
             handles = self.ses.get_torrents()
             while len(handles)>0:
@@ -459,7 +462,8 @@ class TorrentDownloader(Downloader):
                     current_state   = self.state
                     torrent_hash    = str(status.info_hash).upper()
                     
-                    rospy.loginfo_throttle(5, '[%s] %.2f%% complete (down: %.1f kb/s, up: %.1f kB/s, peers: %d) %s: [%s] -> [%s]'% (
+                    rospy.loginfo_throttle(5, '(%4.2f) [%s] %.2f%% complete (down: %.1f kb/s, up: %.1f kB/s, peers: %d) %s: [%s] -> [%s]'% (
+                        self.alarm.elapsed_time,
                         handle_name,
                         progress, 
                         download_rate, 
@@ -481,6 +485,9 @@ class TorrentDownloader(Downloader):
                         
                         ## Update state in DB
                         self.update_db_state(torrent_hash, 'finished')
+                        
+                        ## Stop alarm timer
+                        self.alarm.has_finished()
                     
                     else:
                         rate.sleep()
