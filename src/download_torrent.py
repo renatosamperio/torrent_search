@@ -277,12 +277,12 @@ class TorrentDownloader(Downloader):
                         handle = lt.add_magnet_uri(self.ses, torrent_data['magnet'], self.params) 
                         
                         rospy.loginfo('     Downloading metadata...')
-                        start_time = time.time()
+                        metadata_trigger_time = time.time()
                         metadata_ready = True
                         metadata_expired = True
                         while (not handle.has_metadata() and metadata_expired): 
                             time.sleep(0.5)
-                            metadata_expired = (time.time() - start_time) <= 60
+                            metadata_expired = (time.time() - metadata_trigger_time) <= 60
                             #print "===> metadata_expired:", metadata_expired, self.handle.has_metadata()
                             
                         if not handle.has_metadata():
