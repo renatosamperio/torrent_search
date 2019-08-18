@@ -1,4 +1,4 @@
 <launch>
-  <node name="download_torrent" pkg="torrent_search" type="download_torrent.py" output="log"/>
+  <node name="download_torrent" pkg="torrent_search" type="download_torrent.py" output="log" args="--debug"/>
 
 </launch>
