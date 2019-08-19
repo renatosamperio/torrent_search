@@ -130,14 +130,6 @@ class YtsRecords(object):
                                    'torrent_search/YtsTorrent', 
                                    item,
                                    yts_torrent_info.torrents)
-
-                ## Parsing HS state
-                if 'hs_state' in item_keys:
-                    convert_list(  'history', 
-                                   'torrent_search/YtsHistory', 
-                                   item['hs_state'],
-                                   yts_torrent_info.hs_state.history)
-
                 
                 # Getting manget
                 magnet = self.get_magnet( yts_torrent_info)
