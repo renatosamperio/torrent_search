@@ -181,7 +181,7 @@ class YtsRequests(object):
         except Exception as inst:
               ros_node.ParseException(inst)
 
-    def pull_movies(self, payload):
+    def update_movies(self, payload):
         try:
             retrieved_all_pages = True
             search_page         = payload['page']
@@ -267,7 +267,7 @@ class YtsCrawler(ros_node.RosNode):
                     "page":             1,
                     "with_rt_ratings":  'true'
                 }
-                self.client.pull_movies(payload)
+                self.client.update_movies(payload)
                 
                 ## Wait for being notified that a message
                 ##    has arrived
