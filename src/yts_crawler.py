@@ -63,15 +63,9 @@ class YtsRequests(object):
                 posts       = self.db_handler.Find(condition)
                 if posts.count() < 1:
                     
-                    ## Adding general torrent state
-                    rospy.logdebug('  Adding state element to item')
-                    item.update({
-                        'hs_state': {
-                            'history': [],
-                            'status': 'created',
-
-                        }
-                    })
+                    ## The query by ID did not return anything,
+                    ##    therefore, we should create a new 
+                    ##    torrent in DB
                     
                     ## Adding state per given torrent
                     for torrent in item['torrents']:
