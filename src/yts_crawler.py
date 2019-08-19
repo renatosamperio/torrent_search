@@ -112,18 +112,24 @@ class YtsRequests(object):
                     if len(label)>0:
                         rospy.loginfo('  Found %s'%label)
                         info_label += 'items'
-                        ##pprint(output)
                     
-                    ## Passing torrent state
-                    new_item.update({
-                        'hs_state': old_item['hs_state']
-                    })
-                    
+                    ## Add a download state for each torrent
+                    ##    from the already existing DB record
+                    for db_torrent in old_item['torrents']:
+                        db_torrent_keys = db_torrent.keys()
+                        for i in range(len(new_item['torrents'])):
+                            collected_torrent = new_item['torrents'][i]
+                            if db_torrent['hash'] == collected_torrent['hash'] and 'state' in db_torrent_keys:
+                                collected_torrent['state'] = db_torrent['state']
+
+                                ## Stop after updating all stuff
+                                break
+
                     ##Update new item
                     result = self.db_handler.Update(condition, new_item)
                     rospy.loginfo("  Updated item [%d] %s"%(item_id, info_label))
                     
-
+                    break
         except Exception as inst:
               ros_node.ParseException(inst)
 
