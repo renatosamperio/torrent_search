@@ -67,7 +67,7 @@ class YtsRequests(object):
                     ##    therefore, we should create a new 
                     ##    torrent in DB
                     
-                    ## Adding state per given torrent
+                    ## Add a download state for each torrent
                     for torrent in item['torrents']:
                         torrent.update({'state':{ 'status':'', 'history': []}})
                     
@@ -76,7 +76,9 @@ class YtsRequests(object):
                     if post_id is not None:
                         rospy.loginfo("  Inserted item [%d]"%(item_id))
                 else:
-                    ## Compare new element to old one
+                    
+                    ## It seems the query has found something in 
+                    ##     our DB, compare new element to old one
                     rospy.logdebug("Torrent [%d] already exists"%(item_id))
                     old_item = posts[0]
                     new_item = item
@@ -88,6 +90,8 @@ class YtsRequests(object):
                             use_values=True
                     )
                     
+                    ## The method would not return errors if 
+                    ##    similarities are found
                     if len(error)<1:
                         rospy.logdebug("  Found item [%s] is similar to received message"%item_id)
                         continue
