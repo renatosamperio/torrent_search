@@ -445,7 +445,7 @@ class TorrentDownloader(Downloader):
                 
                 ## Look for each torrent
                 for i in range(len(handles)):
-                    rate            = rospy.Rate(10)
+                    rate            = rospy.Rate(num_handles)
                     handle          = handles[i]
                     status          = handle.status()
                     handle_name     = handle.name()
@@ -489,6 +489,10 @@ class TorrentDownloader(Downloader):
                     
                     else:
                         rate.sleep()
+                
+                ## Looking for each handle
+                handles = self.ses.get_torrents()
+                num_handles = len(handles)
             
             ## Moving to next state
             rospy.loginfo( "Download(s) finished")
