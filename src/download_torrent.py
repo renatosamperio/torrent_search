@@ -427,22 +427,20 @@ class TorrentDownloader(Downloader):
                 status = handle.status()
                 hash = str(status.info_hash).upper()
                 self.update_db_state(hash, 'downloading')
-                
-            ## Starting timed download alarm
-            self.alarm.start()
 
+            ## Starting timed download alarm
             handles = self.ses.get_torrents()
-            while len(handles)>0:
+            num_handles = len(handles)
+            if num_handles>0:
+                self.alarm.start()
+            
+            while num_handles>0:
                 if self.state == 'Paused':
                     with self.fsm_condition:
                         rospy.loginfo('  Download has been halted')
                         self.fsm_condition.wait()
                 
-                ## Looking for each handle
-                handles = self.ses.get_torrents()
-                
                 ## Maximum rate limited to 10 items per second
-                num_handles = len(handles)
                 num_handles = 10 if num_handles >10 else num_handles
                 
                 ## Look for each torrent
