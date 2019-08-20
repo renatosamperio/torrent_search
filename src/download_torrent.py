@@ -342,7 +342,6 @@ class Downloader(object):
     def client_stop_pausing(self):
         try:
             rospy.loginfo('client_stop_pausing: nothing to do')
-            self.unpause()
         except Exception as inst:
               ros_node.ParseException(inst)
               
@@ -827,18 +826,24 @@ class TorrentDownloader(Downloader):
 
     def client_stop_pausing(self):
         try:
-            rospy.loginfo('Re-starting torrents download')
-            self.unpause()
+            if self.is_Paused():
+                rospy.loginfo('Re-starting torrents download')
+                self.unpause()
+            else:
+                rospy.logwarn('Not re-starting, current state is [%s]'%self.state)
         except Exception as inst:
               ros_node.ParseException(inst)
               
     def client_stop_downloading(self):
         try:
-            rospy.loginfo('Pausing torrents download')
-            self.pause()
+            if self.is_Downloading():
+                rospy.loginfo('Pausing torrents download')
+                self.pause()
+            else:
+                rospy.logwarn('Not pausing, current state is [%s]'%self.state)
         except Exception as inst:
               ros_node.ParseException(inst)
-                   
+
 class DownloaderFSM:
     def __init__(self, **kwargs):
         try:
