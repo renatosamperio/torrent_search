@@ -34,6 +34,7 @@ from hs_utils.mongo_handler import MongoAccess
 from hs_utils import json_message_converter as rj
 from torrent_search.msg import State
 from torrent_search.msg import YtsTorrents
+from hs_utils import slack_client
 
 from transitions import Machine
 import libtorrent as lt
@@ -152,6 +153,173 @@ class Alarm:
         except Exception as inst:
               ros_node.ParseException(inst)
 
+class SlackPoster(object):
+    def __init__(self, **kwargs):
+        try:
+            
+            self.slack_client       = None
+            self.slack_channel      = None
+            self.channel_code       = None
+            
+            ## Startking slack client
+            slack_token             = os.environ['SLACK_TOKEN']
+            if not slack_token.startswith('xoxp'):
+                rospy.logerr("Invalid slack token [%s]"%slack_token)
+                rospy.signal_shutdown("Invalid slack token")
+            
+            rospy.logdebug("Got slack token and channel")
+            self.slack_client = slack_client.SlackHandler(slack_token)
+            
+            ## Getting slack channel information
+            try:
+                self.slack_channel= os.environ['SLACK_CHANNEL']
+                self.channel_code = self.slack_client.FindChannelCode(self.slack_channel)
+                rospy.loginfo("Got channel code %s for name %s"%(self.channel_code, self.slack_channel))
+            except KeyError:
+                rospy.logerr("Invalid slack channel")
+                rospy.signal_shutdown("Invalid slack channel")
+                
+        except Exception as inst:
+            ros_node.ParseException(inst)
+        
+    def make_slack_message(self, content):
+        try:
+            
+            rospy.logdebug('Creating slack message')
+            content_keys = content.keys()
+            for i in range(len(content_keys)):
+                key = content_keys[i]
+                content.update({ key: content[key] })
+                rospy.logdebug('  Placed content from [%s]'%key)
+            
+            return [content]
+            
+        except Exception as inst:
+            ros_node.ParseException(inst)
+
+    def post_state(self, torrent_state, hash, target_state):
+        try:
+            for torrent in  torrent_state['torrents']:
+                if torrent['hash'] == hash:
+
+                    ## Colour selection
+                    color    = '#ff0000'
+                    if torrent_state['state'] == 'ok':
+                        color = '#36a64f'
+
+                    ## Making up content to show up
+                    content = {
+                        
+#                             "fallback":    '',
+#                             "author_name": '',
+#                             "author_link": '',
+#                             "author_icon": '',
+#                             
+#                             'pretext':      "",
+                         'title':        torrent_state["title_long"],
+                         'title_link':   "https://www.imdb.com/title/"+torrent_state["imdb_code"]+"/",
+                         'text':         torrent_state["description_full"],
+                        
+                         "color":        color,
+                         "image_url":    torrent_state["large_cover_image"],
+                         "footer":       "YTS",
+                         "footer_icon":  "https://yts.lt/assets/images/website/og_yts_logo.png",
+                         "ts":           int( time.time() ),
+                        
+                         'fields': [
+                             
+                             {
+                                 "title": "Genres",
+                                 "value": ', '.join(torrent_state["genres"]),
+                                 "short": True
+                             },
+                             {
+                                 "title": "Language",
+                                 "value": torrent_state["language"],
+                                 "short": True
+                             },
+                             {
+                                 "title": "Rating",
+                                 "value": torrent_state["rating"],
+                                 "short": True
+                             },
+                             {
+                                 "title": "Runtime",
+                                 "value": torrent_state["runtime"],
+                                 "short": True
+                             },
+                             {
+                                 "title": "Date Uploaded",
+                                 "value": torrent_state["date_uploaded"],
+                                 "short": True
+                             },
+                             {
+                                 "title": "MPA Rating",
+                                 "value": torrent_state["mpa_rating"],
+                                 "short": True
+                             },
+                             {
+                                 "title": "Quality",
+                                 "value": torrent["quality"],
+                                 "short": True
+                             },
+                             {
+                                 "title": "Size",
+                                 "value": torrent["size"],
+                                 "short": True
+                             },
+                             {
+                                 "title": "Seeds",
+                                 "value": torrent["seeds"],
+                                 "short": True
+                             },
+                             {
+                                 "title": "Peers",
+                                 "value": torrent["peers"],
+                                 "short": True
+                             },
+                             {
+                                 "title": "Type",
+                                 "value": torrent["type"].title(),
+                                 "short": True
+                             },
+                             {
+                                 "title": "State",
+                                 "value": target_state.title(),
+                                 "short": True
+                             }
+                         ]
+                    }
+                    
+                    ## Posting message
+                    slack_message = self.make_slack_message(content)
+                    break
+                    response = self.slack_client.PostMessage(
+                        self.slack_channel, "Torrent Download",
+                        attachments = slack_message,
+                     
+                    )
+
+                    ## Something went wrong in the posting
+                    if not response['ok'] :
+                        if response['error'] == 'ratelimited':
+                            ## Put things back into queue but wait for a second...
+                            rospy.loginfo('Slack messages are being posted too fast in channel %s'%
+                                          self.slack_channel)
+                            element = (channel, text, attachment, msg_id)
+                            self.slack_bag.queue.appendleft(element)
+                            rospy.logdebug('ADD:   waiting for %ds'%wait_time)
+                            rospy.sleep(wait_time)
+                        else:
+                            ## We do not know what to do in other case
+                            rospy.logwarn("Slack posting went wrong: %s"%response['error'])
+                            pprint(response)
+                    else:
+                        rospy.loginfo('Slack message was posted for [%s]'%torrent_state["title_long"])
+
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
 class Downloader(object):
     def __init__(self, **kwargs):
         try:
@@ -236,6 +404,9 @@ class TorrentDownloader(Downloader):
             else:
                 rospy.loginfo("Created DB handler in %s.%s"%
                               (self.database, self.collection))
+            
+            ## Create slack poster
+            self.slack_poster = SlackPoster()
             
             ## This variable has to be started before ROS
             ##   params are called
@@ -607,6 +778,10 @@ class TorrentDownloader(Downloader):
                         self.chosen_torrents.append(element)
                     
                     if debug_: pprint(element)
+                    
+                    ## 3) Updating slack status
+                    if target_state == 'finished':
+                        self.slack_poster.post_state(element, hash, target_state)
 
             #pprint(self.chosen_torrents)
             ## Updating local state
