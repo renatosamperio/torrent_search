@@ -293,7 +293,7 @@ class SlackPoster(object):
                     
                     ## Posting message
                     slack_message = self.make_slack_message(content)
-                    break
+                    
                     response = self.slack_client.PostMessage(
                         self.slack_channel, "Torrent Download",
                         attachments = slack_message,
@@ -836,6 +836,7 @@ class TorrentDownloader(Downloader):
               
     def client_stop_downloading(self):
         try:
+            rospy.logdebug('---> Stopping alarm threads ['+self.previous_state+'] -> ['+self.state+']')
             if self.is_Downloading():
                 rospy.loginfo('Pausing torrents download')
                 self.pause()
