@@ -1,5 +1,6 @@
 # Specific paths
 tmp/
+setup/*.bash
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
