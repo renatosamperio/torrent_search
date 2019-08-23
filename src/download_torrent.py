@@ -126,7 +126,7 @@ class Alarm:
         try:
             self.start_time = time.time()
             rate = rospy.Rate(4)
-            rospy.logdebug('ALARM: Starting pause alarm for %2.4fs'%self.download_time)
+            rospy.logdebug('ALARM: Starting pause alarm for %2.4fs'%self.download_pause)
             while not rospy.is_shutdown() and not self.is_finished:
                 rate.sleep();
 
@@ -841,7 +841,7 @@ class TorrentDownloader(Downloader):
                 rospy.loginfo('Pausing torrents download')
                 self.pause()
             else:
-                rospy.logwarn('Not pausing, current state is [%s]'%self.state)
+                rospy.logdebug('Not pausing, current state is [%s]'%self.state)
         except Exception as inst:
               ros_node.ParseException(inst)
 
