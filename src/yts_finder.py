@@ -140,7 +140,8 @@ class YtsRecords(object):
                 parsable_item = copy.deepcopy(item)
                 del parsable_item['_id']
                 del parsable_item['torrents']
-                del parsable_item['hs_state']
+                if 'hs_state' in parsable_item.keys():
+                    del parsable_item['hs_state']
                 
                 ## BUGFIX: Check why torrents is not contained and throws an error
                 
@@ -160,9 +161,6 @@ class YtsRecords(object):
                 # Getting manget
                 magnet = self.get_magnet( yts_torrent_info)
                 
-#                 for torrent in yts_torrent_info.torrents:
-#                     pprint(torrent.magnet)
-
                 ## Appending converted message
                 ros_msg.torrent_items.append(yts_torrent_info)
             
