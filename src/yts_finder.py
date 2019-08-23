@@ -5,6 +5,10 @@ rostopic pub /yts_finder/trigger_download torrent_search/TriggerDownload "header
 seeds: 7000
 search_type: 1" -1;
 
+
+Set a state to another FSM value
+db.torrents.update({ "torrents": { $elemMatch: { hash: "97F58867E989E0DA30CFC56522B08A01646F27D1"} } }, { "$set": { "torrents.$.state.status": "donwloading" } })
+
 '''
 
 import sys, os
@@ -74,6 +78,28 @@ class YtsRecords(object):
 
             ## Execute query
             posts     = self.db_handler.Find(query)
+            rospy.loginfo("Found %d items, converting to ROS message"%posts.count() )
+            ros_msg   = self.db_to_ros(posts)
+                
+        except Exception as inst:
+              ros_node.ParseException(inst)
+        finally:
+            return ros_msg
+
+    def search_not_downloaded(self, options):
+        ## TODO: Return finished torrents?
+        ## TODO: Use multiple criteria for startin to download? -> Make more methods with different queries each one
+        try:
+            configured_options = options.keys()
+            query = {}
+            posts = None
+
+            rospy.logdebug('Search DB with given title')
+            query = { '$and': [ {'torrents.seeds': { '$gte': options['seeds'] }},{ "torrents.state.status": { '$ne': "finished" }  } ] } 
+
+            ## Execute query
+            posts     = self.db_handler.Find(query)
+            rospy.loginfo("Found %d items, converting to ROS message"%posts.count() )
             ros_msg   = self.db_to_ros(posts)
                 
         except Exception as inst:
