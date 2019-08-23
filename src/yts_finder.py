@@ -262,21 +262,30 @@ class YtsFinder(ros_node.RosNode):
                     ## Get a list of not downloaded torrents
                     options = {}
                     
-                    ## Looking for torrents with similar name
-                    if msg.search_type ==  TriggerDownload.SEARCH_BY_TITLE:
-                        options.update({'query': msg.title})
-                        rospy.loginfo('Setting up title-based query')
-                        
-                    ## Looking for torrents with higher seeds
-                    if msg.search_type ==  TriggerDownload.SEARCH_BY_SEEDS:
+                    ## Looking torrents with highest seeds and not download
+                    if msg.search_type ==  TriggerDownload.SEARCH_BY_SEEDS_NOT_DOWNLOADED:
+                        rospy.loginfo('Setting up not download seeds-based query')
                         options.update({'seeds': msg.seeds})
-                        rospy.loginfo('Setting up seeds-based query')
                         
-                    ## Setting search query
-                    msg = self.client.search_not_finished_torrents(options)
+                        ## Setting search query
+                        msg = self.client.search_not_downloaded(options)
+                
+                    else:
+                        ## Looking for torrents with similar name
+                        if msg.search_type ==  TriggerDownload.SEARCH_BY_TITLE:
+                            options.update({'query': msg.title})
+                            rospy.loginfo('Setting up title-based query')
+                        ## Looking for torrents with higher seeds
+                        elif msg.search_type ==  TriggerDownload.SEARCH_BY_SEEDS:
+                            options.update({'seeds': msg.seeds})
+                            rospy.loginfo('Setting up seeds-based query')
+                            
+                        ## Setting search query
+                        msg = self.client.search_not_finished_torrents(options)
+                        
                     rospy.logdebug('Publishing parsed items')
-                    
                     self.Publish('~found_torrents', msg)
+
         except Exception as inst:
               ros_node.ParseException(inst)
 
