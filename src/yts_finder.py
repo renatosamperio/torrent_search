@@ -7,8 +7,11 @@ search_type: 1" -1;
 
 
 Set a state to another FSM value
-db.torrents.update({ "torrents": { $elemMatch: { hash: "97F58867E989E0DA30CFC56522B08A01646F27D1"} } }, { "$set": { "torrents.$.state.status": "donwloading" } })
+db.torrents.update({ "torrents": { $elemMatch: { hash: "B2A8EC14D9B756B0E49C759D33BB5CDA2A0BA277"} } }, { "$set": { "torrents.$.state.status": "donwloading" } })
 
+
+Looks for finished torrents:
+db.torrents.find( { "torrents.state.status": "downloading" } ).pretty()
 '''
 
 import sys, os
@@ -68,12 +71,12 @@ class YtsRecords(object):
 
             ## Search DB with uppers seeds limit
             if 'seeds' in configured_options:
-                rospy.logdebug('Searching DB with uppers seeds limit')
+                rospy.loginfo('Searching DB with uppers seeds limit')
                 query = { 'torrents.seeds': { '$gte': options['seeds'] } }
 
             ## Search DB with given title
             elif 'query' in configured_options:
-                rospy.logdebug('Search DB with given title')
+                rospy.loginfo('Search DB with given title')
                 query = {'title': { '$regex': options['query'] } }
 
             ## Execute query
@@ -94,7 +97,7 @@ class YtsRecords(object):
             query = {}
             posts = None
 
-            rospy.logdebug('Search DB with given title')
+            rospy.loginfo('Search DB with given title')
             query = { '$and': [ {'torrents.seeds': { '$gte': options['seeds'] }},{ "torrents.state.status": { '$ne': "finished" }  } ] } 
 
             ## Execute query
@@ -212,7 +215,7 @@ class YtsFinder(ros_node.RosNode):
     def SubscribeCallback(self, msg, topic):
         try:
             ## Storing message for queue
-            rospy.loginfo('Got query message')
+            rospy.logdebug('Got query message')
             stored_items = (topic, msg)
             self.queue.put( stored_items )
             
