@@ -1066,12 +1066,7 @@ class DownloadTorrent(ros_node.RosNode):
                 with self.lock:
                     (topic, msg) = self.queue.get()
                 
-                if self.downloader.fsm.state != 'Start':
-                    rospy.logwarn('Current state is ready to start, is [%s]'%self.downloader.fsm.state)
-                    continue
-                else:
-                    rospy.loginfo('Current state -> [%s]'%self.downloader.fsm.state)
-                    
+                rospy.loginfo('Received query, current state -> ['+self.downloader.fsm.previous_state+'] -> ['+self.downloader.fsm.state+']')
                 args = {}
                 if 'move_state' in topic:
                     self.downloader.next(msg.state, **args)
@@ -1086,8 +1081,13 @@ class DownloadTorrent(ros_node.RosNode):
                     ## Preparing state transition with input data
                     args = {'info': msg}
 
+                    ## If it is already downloading to to setup
+                    next_state = 'configure'
+                    if self.downloader.fsm.is_running():
+                        next_state = 'incorporate'
+                    
                     ## Going to next state
-                    self.downloader.next('configure', **args)
+                    self.downloader.next(next_state, **args)
 
         except Exception as inst:
               ros_node.ParseException(inst)
