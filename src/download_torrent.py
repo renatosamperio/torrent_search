@@ -1072,7 +1072,11 @@ class DownloadTorrent(ros_node.RosNode):
                     self.downloader.next(msg.state, **args)
                 
                 else:
-                    
+                    ## Checking if message is empty
+                    if len(msg.torrent_items) < 1:
+                        rospy.loginfo("Empty query")
+                        continue
+
                     ## Get best magnet to download
                     ## Making ROS message into a dictionary
                     msg = json.loads(rj.convert_ros_message_to_json(msg) )
