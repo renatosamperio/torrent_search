@@ -484,19 +484,20 @@ class TorrentDownloader(Downloader):
             if not self.is_Downloading():
                 self.failed_downloading()
             else:
+                
+                ## Update new state in DB and locally
+                rospy.logdebug('  Updating downloading status for existing handlers')
+                handles = self.ses.get_torrents()
+                for handle in handles:
+                    status = handle.status()
+                    hash = str(status.info_hash).upper()
+                    self.update_db_state(hash, 'downloading')
+                        
                 ## Verify is session isn't already downloading stuff...
-                #print "===> session is_listening?", self.ses.is_listening()
                 if not self.download_started:
                     self.download_started = True
                     rospy.logdebug('---> Starting to download ['+self.previous_state+'] -> ['+self.state+']')
                     
-                    ## Update new state in DB and locally
-                    rospy.logdebug('  Updating downloading status for all handlers')
-                    handles = self.ses.get_torrents()
-                    for handle in handles:
-                        status = handle.status()
-                        hash = str(status.info_hash).upper()
-                        self.update_db_state(hash, 'downloading')
                 
                     ## Downloading thread
                     rospy.Timer(rospy.Duration(0.5), self.downloader_thread, oneshot=True)
