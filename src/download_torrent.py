@@ -871,6 +871,7 @@ class DownloaderFSM:
             self.transitions = [
                 { 'trigger': 'configure',   'source': 'Start',          'dest': 'Setup' },
                 { 'trigger': 'download',    'source': 'Setup',          'dest': 'Downloading' },
+                { 'trigger': 'incorporate', 'source': 'Downloading',    'dest': 'Setup' },
                 { 'trigger': 'done',        'source': 'Downloading',    'dest': 'Finished' },
                 { 'trigger': 'pause',       'source': 'Downloading',    'dest': 'Paused' },
                 { 'trigger': 'unpause',     'source': 'Paused',         'dest': 'Downloading' },
@@ -905,7 +906,7 @@ class DownloaderFSM:
         try:
             ## Keeping previous state
             self.fsm.previous_state = self.fsm.state
-            rospy.logdebug('Previous state: '+self.fsm.previous_state)
+            rospy.logdebug('Going to NEXT state, previous state: '+self.fsm.previous_state)
             
             ## Rotating FSM
             if next_state == 'configure':
@@ -915,6 +916,8 @@ class DownloaderFSM:
                     self.fsm.fail()
                     return
                 self.fsm.configure(torrent=args['info'])
+            elif next_state == 'incorporate':
+                self.fsm.incorporate(torrent=args['info'])
             elif next_state == 'download':
                 self.fsm.download()
             elif next_state == 'pause':
