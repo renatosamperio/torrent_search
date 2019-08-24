@@ -89,6 +89,42 @@ class YtsRecords(object):
         finally:
             return ros_msg
 
+    def search_one_torrent(self, options):
+        ## TODO: Return finished torrents?
+        ## TODO: Use multiple criteria for startin to download? -> Make more methods with different queries each one
+        try:
+            configured_options = options.keys()
+            query = {}
+            posts = None
+
+            ## Search DB with uppers seeds limit
+            if 'torrent_id' in configured_options:
+                rospy.loginfo('Searching DB by torrent ID')
+                query = { 'id': options['torrent_id'] }
+
+            ## Search DB with given title
+            elif 'imdb' in configured_options:
+                rospy.loginfo('Search DB by IMDB code')
+                query = { 'imdb_code': options['imdb'] }
+
+            ## Search DB with given title
+            elif 'hash' in configured_options:
+                rospy.loginfo('Search DB by torrent hash code')
+                query =  { "torrents": { '$elemMatch': { 'hash': options['hash']} } }
+
+            ## Execute query
+            posts     = self.db_handler.Find(query)
+            if posts.count()<2:
+                rospy.loginfo("Found %d items, converting to ROS message"%posts.count() )
+            else:
+                rospy.logwarn("Found %d items, should be only one"%posts.count() )
+            ros_msg   = self.db_to_ros(posts)
+                
+        except Exception as inst:
+              ros_node.ParseException(inst)
+        finally:
+            return ros_msg
+
     def search_not_downloaded(self, options):
         ## TODO: Return finished torrents?
         ## TODO: Use multiple criteria for startin to download? -> Make more methods with different queries each one
