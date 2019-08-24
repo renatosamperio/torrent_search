@@ -448,10 +448,12 @@ class TorrentDownloader(Downloader):
 
                         ## Preparing to download torrent
                         torernt_name = torrent_info['title_long']+'-'+torrent_data['quality']+'-'+torrent_data['type']
-                        rospy.loginfo('  Preparing to download torrent [%s]'%(torernt_name))
+                        num_handles = len(self.ses.get_torrents())
+                        rospy.loginfo('  Preparing to download torrent [%s], current handles [%d]'%(torernt_name ,num_handles))
                         handle = lt.add_magnet_uri(self.ses, torrent_data['magnet'], self.params) 
                         
-                        rospy.loginfo('     Downloading metadata...')
+                        num_handles = len(self.ses.get_torrents())
+                        rospy.loginfo('     Downloading metadata, current handles [%d]',num_handles)
                         metadata_trigger_time = time.time()
                         metadata_ready = True
                         metadata_expired = True
