@@ -51,8 +51,9 @@ class Alarm:
     def __init__(self, **kwargs):
         try:
             ## Class variables
-            self.started_coincidence_counter    = None
             self.is_finished                    = False
+            self.is_running                     = False
+            self.is_paused                      = False
             self.download_time                  = 0 #s
             self.download_pause                 = 0 #s
             
@@ -103,6 +104,8 @@ class Alarm:
             self.start_time = time.time()
             rate = rospy.Rate(4)
             rospy.logdebug('ALARM: Starting download alarm for %2.4fs'%self.download_time)
+            self.is_paused  = False
+            self.is_running = True
             while not rospy.is_shutdown() and not self.is_finished:
                 rate.sleep();
                 
@@ -117,6 +120,8 @@ class Alarm:
             if self.client_stop_downloading is not None:
                 self.client_stop_downloading()
             
+            self.is_running = False
+            self.is_paused  = True
             ## Looping into pause timer
             self.stop()
         except Exception as inst:
@@ -844,6 +849,12 @@ class TorrentDownloader(Downloader):
                 rospy.logdebug('Not pausing, current state is [%s]'%self.state)
         except Exception as inst:
               ros_node.ParseException(inst)
+
+    def is_running(self):
+        return self.alarm.is_running
+    
+    def is_paused(self):
+        return self.alarm.is_paused
 
 class DownloaderFSM:
     def __init__(self, **kwargs):
