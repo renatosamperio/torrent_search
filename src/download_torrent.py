@@ -618,12 +618,16 @@ class TorrentDownloader(Downloader):
                         rospy.loginfo('  Download has been halted')
                         self.fsm_condition.wait()
                 
+                ## Looking for each handle
+                handles     = self.ses.get_torrents()
+                num_handles = len(handles)
+                
                 ## Maximum rate limited to 10 items per second
                 num_handles = 10 if num_handles >10 else num_handles
                 
                 ## Look for each torrent
-                for i in range(len(handles)):
-                    rate            = rospy.Rate(num_handles)
+                for i in range(num_handles):
+                    rate            = rospy.Rate(0.5)
                     handle          = handles[i]
                     status          = handle.status()
                     handle_name     = handle.name()
@@ -638,7 +642,7 @@ class TorrentDownloader(Downloader):
                     current_state   = self.state
                     torrent_hash    = str(status.info_hash).upper()
                     
-                    rospy.loginfo_throttle(5, '(%4.2f) [%s] %.2f%% complete (down: %.1f kb/s, up: %.1f kB/s, peers: %d) %s: [%s] -> [%s]'% (
+                    rospy.loginfo('(%4.2f) [%s] %.2f%% complete (down: %.1f kb/s, up: %.1f kB/s, peers: %d) %s: [%s] -> [%s]'% (
                         self.alarm.elapsed_time,
                         handle_name,
                         progress, 
@@ -668,9 +672,6 @@ class TorrentDownloader(Downloader):
                     else:
                         rate.sleep()
                 
-                ## Looking for each handle
-                handles = self.ses.get_torrents()
-                num_handles = len(handles)
             
             ## Moving to next state
             rospy.loginfo( "Download(s) finished")
