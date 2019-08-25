@@ -104,7 +104,6 @@ class Alarm:
             self.start_time = time.time()
             rate = rospy.Rate(4)
             rospy.logdebug('ALARM: Starting download alarm for %2.4fs'%self.download_time)
-            self.is_paused  = False
             self.is_running = True
             while not rospy.is_shutdown() and not self.is_finished:
                 rate.sleep();
@@ -121,7 +120,6 @@ class Alarm:
                 self.client_stop_downloading()
             
             self.is_running = False
-            self.is_paused  = True
             ## Looping into pause timer
             self.stop()
         except Exception as inst:
@@ -132,13 +130,14 @@ class Alarm:
             self.start_time = time.time()
             rate = rospy.Rate(4)
             rospy.logdebug('ALARM: Starting pause alarm for %2.4fs'%self.download_pause)
+            self.is_paused  = True
             while not rospy.is_shutdown() and not self.is_finished:
                 rate.sleep();
 
                 self.elapsed_time = time.time() - self.start_time
                 #print "===>pause elapsed_time:", self.elapsed_time
                 if self.elapsed_time> self.download_pause:
-                    self.download_timer_running = False
+                    self.is_paused = False
                     break
             rospy.logdebug('ALARM: Stopped pause timer after: %2.4fs'%self.elapsed_time)
             
@@ -146,7 +145,6 @@ class Alarm:
             if self.client_stop_pausing is not None:
                 self.client_stop_pausing()
             
-            ## Looping into pause timer
             self.start()
         except Exception as inst:
               ros_node.ParseException(inst)
