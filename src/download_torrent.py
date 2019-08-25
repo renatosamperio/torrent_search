@@ -1074,39 +1074,41 @@ class DownloadTorrent(ros_node.RosNode):
             while not rospy.is_shutdown():
                 ## Wait for being notified that a message
                 ##    has arrived
+                args = {}
                 with self.condition:
-                    rospy.logdebug('  Waiting for message in state -> [%s]'%self.downloader.fsm.state)
+                    rospy.logdebug('  Waiting for message in state -> [%s]'%
+                                   self.downloader.fsm.state)
                     self.condition.wait()
                 
                 with self.lock:
                     (topic, msg) = self.queue.get()
                 
-                rospy.loginfo('Received query, current state -> ['+self.downloader.fsm.previous_state+'] -> ['+self.downloader.fsm.state+']')
-                args = {}
+                rospy.loginfo('Received query, current state -> [%s] -> [%s]'%
+                              (self.downloader.fsm.previous_state, self.downloader.fsm.state))
                 if 'move_state' in topic:
                     self.downloader.next(msg.state, **args)
+                    continue
                 
-                else:
-                    ## Checking if message is empty
-                    if len(msg.torrent_items) < 1:
-                        rospy.loginfo("Empty query")
-                        continue
+                ## Checking if message is empty
+                if len(msg.torrent_items) < 1:
+                    rospy.loginfo("Empty query")
+                    continue
 
-                    ## Get best magnet to download
-                    ## Making ROS message into a dictionary
-                    msg = json.loads(rj.convert_ros_message_to_json(msg) )
-                    msg = self.downloader.make_magnet(msg, topic)
+                ## Get best magnet to download
+                ## Making ROS message into a dictionary
+                msg = json.loads(rj.convert_ros_message_to_json(msg) )
+                msg = self.downloader.make_magnet(msg, topic)
 
-                    ## Preparing state transition with input data
-                    args = {'info': msg}
+                ## If it is already downloading to to setup
+                next_state = 'configure'
+                if self.downloader.fsm.is_running():
+                    next_state = 'incorporate'
+                elif self.downloader.fsm.is_paused():
+                    next_state = 'halted_add'
 
-                    ## If it is already downloading to to setup
-                    next_state = 'configure'
-                    if self.downloader.fsm.is_running():
-                        next_state = 'incorporate'
-                    
-                    ## Going to next state
-                    self.downloader.next(next_state, **args)
+                ## Going to next state with input data
+                args = {'info': msg}
+                self.downloader.next(next_state, **args)
 
         except Exception as inst:
               ros_node.ParseException(inst)
