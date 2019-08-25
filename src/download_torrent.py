@@ -487,7 +487,7 @@ class TorrentDownloader(Downloader):
         try:
             ## Validating current FSM state
             if not self.is_Downloading():
-                self.failed_downloading()
+                self.failed_transition()
             else:
                 
                 ## Update new state in DB and locally
