@@ -329,7 +329,7 @@ class Downloader(object):
             ## Automatic start and stop
             seconds_per_hour        = 3600
             self.download_time      = 0.5* seconds_per_hour #s
-            self.download_pause     = 12.0*seconds_per_hour #s
+            self.download_pause     = 6.0* seconds_per_hour #s
             rospy.logdebug('Starting alarm')
             args = {
                 'download_time':            self.download_time,
@@ -540,12 +540,15 @@ class TorrentDownloader(Downloader):
         except Exception as inst:
               ros_node.ParseException(inst)
 
-    def failed_downloading(self): 
+    def halted_add(self, torrent=None):
         try:
-            rospy.logwarn('---> Failed downloading...')
+            ## Do not resume download if downloader thread
+            ##    is paused because of the time
+            rospy.logdebug('---> Halted torrent update ['+self.previous_state+'] -> ['+self.state+']')
+            
         except Exception as inst:
               ros_node.ParseException(inst)
-
+        
     def failed_transition(self): 
         try:
             rospy.logdebug('---> Failed transition ['+self.previous_state+'] -> ['+self.state+']')
