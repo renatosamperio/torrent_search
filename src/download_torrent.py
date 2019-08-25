@@ -468,7 +468,14 @@ class TorrentDownloader(Downloader):
                         ## Setting up connection options
                         handle.set_upload_limit(self.up_limit)
                         handle.set_max_connections(self.max_connections)
-                        
+            
+            ## Resume download quickly to add torrent
+            if self.is_paused():
+                rospy.loginfo('Download not started, pausing again session...')
+                self.ses.pause()
+                self.pause()
+                return
+            
             ## Moving to next state
             self.download()
             
@@ -524,12 +531,18 @@ class TorrentDownloader(Downloader):
         except Exception as inst:
               ros_node.ParseException(inst)
               
-    def restore_download(self): 
+    def resume(self, torrent=None): 
         try:
             if not self.is_Paused():
                 self.failed_pause()
             else:
-                rospy.logdebug('---> Restore download ['+self.previous_state+'] -> ['+self.state+']')
+                rospy.logdebug('---> Resume download ['+self.previous_state+'] -> ['+self.state+']')
+            
+            ## Resume download quickly to add torrent
+            if self.is_paused():
+                rospy.logdebug('Download not resumed, configuring new torrent')
+                self.ses.resume()
+                return
                 
             ## Notify data is in the queue
             with self.fsm_condition:
@@ -872,11 +885,15 @@ class DownloaderFSM:
             self.transitions = [
                 { 'trigger': 'configure',   'source': 'Start',          'dest': 'Setup' },
                 { 'trigger': 'download',    'source': 'Setup',          'dest': 'Downloading' },
+                { 'trigger': 'pause',       'source': 'Setup',          'dest': 'Paused' },
                 { 'trigger': 'incorporate', 'source': 'Downloading',    'dest': 'Setup' },
                 { 'trigger': 'done',        'source': 'Downloading',    'dest': 'Finished' },
                 { 'trigger': 'pause',       'source': 'Downloading',    'dest': 'Paused' },
                 { 'trigger': 'unpause',     'source': 'Paused',         'dest': 'Downloading' },
+                { 'trigger': 'halted_add',  'source': 'Paused',         'dest': 'Setup' },
                 { 'trigger': 'restart',     'source': 'Finished',       'dest': 'Start' },
+                
+                ## Failure transitions
                 { 'trigger': 'fail',        'source': 'Start',          'dest': 'Error' },
                 { 'trigger': 'fail',        'source': 'Setup',          'dest': 'Error' },
                 { 'trigger': 'fail',        'source': 'Downloading',    'dest': 'Error' },
@@ -896,7 +913,7 @@ class DownloaderFSM:
             self.machine.on_enter_Downloading   ('start_downloading')
             self.machine.on_enter_Finished      ('close_torrent')
             self.machine.on_enter_Paused        ('pausing_download')
-            self.machine.on_exit_Paused         ('restore_download')
+            self.machine.on_exit_Paused         ('resume')
             self.machine.on_exit_Error          ('reset_error')
             self.machine.on_enter_Error         ('failed_transition')
             
@@ -911,14 +928,11 @@ class DownloaderFSM:
             
             ## Rotating FSM
             if next_state == 'configure':
-                
-                if "info" not in args.keys() :
-                    rospy.logwarn('No torrent info in state transition')
-                    self.fsm.fail()
-                    return
                 self.fsm.configure(torrent=args['info'])
             elif next_state == 'incorporate':
                 self.fsm.incorporate(torrent=args['info'])
+            elif next_state == 'halted_add':
+                self.fsm.halted_add(torrent=args['info'])
             elif next_state == 'download':
                 self.fsm.download()
             elif next_state == 'pause':
