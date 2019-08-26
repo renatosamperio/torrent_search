@@ -2,8 +2,8 @@
 
 '''
 rostopic pub /yts_finder/trigger_download torrent_search/TriggerDownload "header: auto
-seeds: 7000
-search_type: 1" -1;
+seeds: 1900
+search_type: 3" -1;
 
 
 Set a state to another FSM value
