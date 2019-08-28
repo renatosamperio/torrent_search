@@ -10,4 +10,4 @@ source $HS_HOME/devel/setup.bash
 
 # Starting band search
 info "Triggering YTS crawler"
-rostopic pub /yts_crawler/pull_messages std_msgs/Bool  "data: true" 
+rostopic pub /yts_crawler/pull_messages std_msgs/Bool  "data: true" -1;
