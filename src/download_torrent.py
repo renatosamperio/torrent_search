@@ -134,7 +134,7 @@ class Alarm:
             rate = rospy.Rate(4)
             rospy.logdebug('ALARM: Starting pause alarm for %2.4fs'%self.download_pause)
             self.is_paused  = True
-            while not rospy.is_shutdown() and not self.is_finished:
+            while not rospy.is_shutdown() and self.is_paused:
                 rate.sleep();
 
                 self.elapsed_time = time.time() - self.start_time
