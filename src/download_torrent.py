@@ -551,17 +551,11 @@ class TorrentDownloader(Downloader):
                 self.failed_pause()
             else:
                 rospy.logdebug('---> Resume download ['+self.previous_state+'] -> ['+self.state+']')
-            
-            ## Resume download quickly to add torrent
-            if self.is_paused():
-                rospy.logdebug('Download not resumed, configuring new torrent')
-                self.ses.resume()
-                return
-                
-            ## Notify data is in the queue
-            with self.fsm_condition:
-                self.fsm_condition.notifyAll()
-            
+
+            if self.alarm.is_paused:
+                rospy.logdebug('Stopping pausing timer, starting downloading timer')
+                self.alarm.resume_download()
+
             ## Resume session
             self.ses.resume()
         except Exception as inst:
@@ -571,7 +565,12 @@ class TorrentDownloader(Downloader):
         try:
             ## Do not resume download if downloader thread
             ##    is paused because of the time
-            rospy.logdebug('---> Halted torrent update ['+self.previous_state+'] -> ['+self.state+']')
+            rospy.logwarn('---> Halted torrent update ['+self.previous_state+'] -> ['+self.state+']')
+            
+            
+            if self.is_paused():
+                rospy.logwarn("Stop the pause timer!")
+                self.alarm.resume_download()
             
         except Exception as inst:
               ros_node.ParseException(inst)
