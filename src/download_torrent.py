@@ -158,6 +158,13 @@ class Alarm:
             rospy.logdebug('ALARM: Setting alarm to be finished')
         except Exception as inst:
               ros_node.ParseException(inst)
+    
+    def resume_download(self):
+        try:
+            self.is_paused = False
+            rospy.logdebug('ALARM: Setting alarm to unapuse timer')
+        except Exception as inst:
+              ros_node.ParseException(inst)
 
 class SlackPoster(object):
     def __init__(self, **kwargs):
