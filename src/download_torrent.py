@@ -558,6 +558,26 @@ class TorrentDownloader(Downloader):
 
             ## Resume session
             self.ses.resume()
+
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
+    def unlocking(self):
+        try:
+            ## Do not resume download if downloader thread
+            ##    is paused because of the time
+            rospy.loginfo('---> Unlocking downloading thread ['+self.previous_state+'] -> ['+self.state+']')
+            
+            
+            if not self.is_paused():
+                ## Notify data is in the queue
+                rospy.logdebug('Notifying download loop!')
+                with self.fsm_condition:
+                    self.fsm_condition.notifyAll()
+
+            ## Moving to next state
+            self.download()
+
         except Exception as inst:
               ros_node.ParseException(inst)
 
@@ -896,7 +916,7 @@ class DownloaderFSM:
     def __init__(self, **kwargs):
         try:
             # The states
-            self.states=['Start', 'Setup', 'Downloading', 'Paused', 'Finished', 'Error']
+            self.states=['Start', 'Setup', 'Downloading', 'Paused', 'Unlock', 'Finished', 'Error']
             
             # And some transitions between states. We're lazy, so we'll leave out
             # the inverse phase transitions (freezing, condensation, etc.).
@@ -909,6 +929,8 @@ class DownloaderFSM:
                 { 'trigger': 'pause',       'source': 'Downloading',    'dest': 'Paused' },
                 { 'trigger': 'unpause',     'source': 'Paused',         'dest': 'Downloading' },
                 { 'trigger': 'halted_add',  'source': 'Paused',         'dest': 'Setup' },
+                { 'trigger': 'download',    'source': 'Unlock',         'dest': 'Downloading' },
+                { 'trigger': 'remove_pause','source': 'Paused',         'dest': 'Unlock' },
                 { 'trigger': 'restart',     'source': 'Finished',       'dest': 'Start' },
                 
                 ## Failure transitions
@@ -927,6 +949,7 @@ class DownloaderFSM:
                                    transitions=self.transitions, 
                                    initial='Start')
             
+            self.machine.on_enter_Unlock        ('unlocking')
             self.machine.on_enter_Setup         ('set_up_configuration')
             self.machine.on_enter_Downloading   ('start_downloading')
             self.machine.on_enter_Finished      ('close_torrent')
@@ -957,8 +980,15 @@ class DownloaderFSM:
                 self.fsm.pause()
             elif next_state == 'unpause':
                 self.fsm.unpause()
+            elif next_state == 'remove_pause':
+                self.fsm.remove_pause()
             elif next_state == 'done':
                 self.fsm.done()
+            else:
+                rospy.logwarn('Unknown NEXT state')
+            
+            ## TODO: Check why args are not removed after looping...
+            args = None
             
             rospy.loginfo('Current state: '+self.fsm.state)
         except Exception as inst:
