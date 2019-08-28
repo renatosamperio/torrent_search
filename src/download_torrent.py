@@ -87,7 +87,10 @@ class Alarm:
             rospy.logdebug('ALARM: Calling alarm timer')
             ## Executioning thread
             if not self.is_finished:
+                rospy.logdebug('Calling start timer...')
                 rospy.Timer(rospy.Duration(0.5), self.download_timer, oneshot=True)
+            else:
+                rospy.logdebug('Start timer not called, as it not finished')
         except Exception as inst:
               ros_node.ParseException(inst)
               
@@ -488,11 +491,12 @@ class TorrentDownloader(Downloader):
             ## Validating current FSM state
             if not self.is_Downloading():
                 self.failed_transition()
-            else:
+            elif self.previous_state != 'Paused':
                 
                 ## Update new state in DB and locally
-                rospy.logdebug('  Updating downloading status for existing handlers')
+                rospy.logdebug('  Updating downloading status for existing handlers ['+self.previous_state+'] -> ['+self.state+']')
                 handles = self.ses.get_torrents()
+                    
                 for handle in handles:
                     status = handle.status()
                     hash = str(status.info_hash).upper()
@@ -508,7 +512,10 @@ class TorrentDownloader(Downloader):
                     rospy.Timer(rospy.Duration(0.5), self.downloader_thread, oneshot=True)
                 else:
                     rospy.logdebug('---> Download thread already started  ['+self.previous_state+'] -> ['+self.state+']')
-             
+            else:
+                 rospy.loginfo('Downloading from paused state')
+                 
+            ## Keeping last state
             self.previous_state = self.state
         except Exception as inst:
               ros_node.ParseException(inst)
@@ -858,6 +865,11 @@ class TorrentDownloader(Downloader):
               ros_node.ParseException(inst)
               
     def client_stop_downloading(self):
+        '''
+        This method is called by client, and should not interact directly with 
+        unpause mechanism. It should advance state and in the transition it 
+        should be managed how to unpause the timer
+        '''
         try:
             rospy.logdebug('---> Stopping alarm threads ['+self.previous_state+'] -> ['+self.state+']')
             if self.is_Downloading():
@@ -1086,6 +1098,7 @@ class DownloadTorrent(ros_node.RosNode):
                 rospy.loginfo('Received query, current state -> [%s] -> [%s]'%
                               (self.downloader.fsm.previous_state, self.downloader.fsm.state))
                 if 'move_state' in topic:
+                    rospy.logdebug('Moving state on request')
                     self.downloader.next(msg.state, **args)
                     continue
                 
