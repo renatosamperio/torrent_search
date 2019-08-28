@@ -2,7 +2,7 @@
 
 '''
 rostopic pub /yts_finder/trigger_download torrent_search/TriggerDownload "header: auto
-seeds: 1900
+seeds: 1800
 search_type: 3" -1;
 
 
