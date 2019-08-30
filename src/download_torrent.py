@@ -351,6 +351,15 @@ class Downloader(object):
             self.download_time      = 0.5* seconds_per_hour #s
             self.download_pause     = 6.0* seconds_per_hour #s
             rospy.logdebug('Starting alarm')
+            
+            for key, value in kwargs.iteritems():
+                if "download_time" == key:
+                    self.download_time = value
+                    rospy.logdebug('  Setting download_time to [%f]'%self.download_time)
+                elif "download_pause" == key:
+                    self.download_pause = value
+                    rospy.logdebug('  Setting download_pause to [%f]'%self.download_pause)
+                    
             args = {
                 'download_time':            self.download_time,
                 'download_pause':           self.download_pause,
@@ -378,7 +387,7 @@ class TorrentDownloader(Downloader):
     def __init__(self, **kwargs):
         try:
             
-            super(TorrentDownloader, self).__init__()
+            super(TorrentDownloader, self).__init__(**kwargs)
 
             self.state_str = [
                     'queued', 
@@ -1083,6 +1092,9 @@ class DownloadTorrent(ros_node.RosNode):
             
             ## Local variables
             self.downloader     = None
+            self.download_time  = None
+            self.download_pause = None
+            self.args           = kwargs
             
             ## This variable has to be started before ROS
             ##   params are called
@@ -1096,13 +1108,6 @@ class DownloadTorrent(ros_node.RosNode):
             ## Initialising parent class with all ROS stuff
             super(DownloadTorrent, self).__init__(**kwargs)
             
-            ## Local FSM
-            kwargs.update({
-                'database':     'yts',
-                'collection':   'torrents'
-            })
-            self.downloader = DownloaderFSM(**kwargs)
-            
             ## Initialise node activites
             self.Init()
         except Exception as inst:
@@ -1110,6 +1115,20 @@ class DownloadTorrent(ros_node.RosNode):
 
     def Init(self):
         try:
+            
+            self.download_time = self.GetParam('/download_torrent/download_time')
+            rospy.logdebug('+ Got download_time of [%s]'%str(self.download_time))
+            self.download_pause = self.GetParam('/download_torrent/download_pause')
+            rospy.logdebug('+ Got download_pause of [%s]'%str(self.download_pause))
+            
+            ## Local FSM
+            self.args.update({
+                'database':      'yts',
+                'collection':    'torrents',
+                'download_time':  self.download_time,
+                'download_pause': self.download_pause
+            })
+            self.downloader = DownloaderFSM(**self.args)
             
             ## Executioning thread
             rospy.Timer(rospy.Duration(0.5), self.Run, oneshot=True)
@@ -1242,7 +1261,8 @@ if __name__ == '__main__':
 #         ('/event_locator/updated_events', WeeklyEvents)
     ]
     system_params  = [
-        #'/event_locator_param'
+        '/download_torrent/download_time',
+        '/download_torrent/download_pause'
     ]
     
     ## Defining arguments
@@ -1254,6 +1274,7 @@ if __name__ == '__main__':
     args.update({'latch':           options.latch})
     args.update({'sub_topics':      sub_topics})
     args.update({'pub_topics':      pub_topics})
+    args.update({'system_params':   system_params})
     
     # Go to class functions that do all the heavy lifting.
     try:
