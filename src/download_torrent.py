@@ -34,6 +34,7 @@ from hs_utils.mongo_handler import MongoAccess
 from hs_utils import json_message_converter as rj
 from torrent_search.msg import State
 from torrent_search.msg import YtsTorrents
+from std_msgs.msg import Float64
 from hs_utils import slack_client
 
 from transitions import Machine
@@ -85,6 +86,7 @@ class Alarm:
             
             self.is_finished = False
             rospy.logdebug('ALARM: Calling alarm timer')
+            
             ## Executioning thread
             if not self.is_finished:
                 rospy.logdebug('Calling start timer...')
@@ -114,7 +116,7 @@ class Alarm:
                 
                 self.elapsed_time = time.time() - self.start_time
                 
-                #print "===>download elapsed_time:", self.elapsed_time
+                #print "===>download elapsed_time:", self.elapsed_time, self.download_time
                 if self.elapsed_time> self.download_time:
                     break
             rospy.logdebug('ALARM: Stopped download timer after: %2.4fs'%self.elapsed_time)
@@ -139,7 +141,7 @@ class Alarm:
                 rate.sleep();
 
                 self.elapsed_time = time.time() - self.start_time
-                #print "===>pause elapsed_time:", self.elapsed_time
+                #print "===>pause elapsed_time:", self.elapsed_time, self.download_pause
                 if self.elapsed_time> self.download_pause:
                     self.is_paused = False
                     break
@@ -1255,6 +1257,8 @@ if __name__ == '__main__':
     sub_topics     = [
         ('~move_state',                 State),
         ('~start',                      State),
+        ('~set_download_pause',         Float64),
+        ('~set_download_time',          Float64),
         ('/yts_finder/found_torrents',  YtsTorrents)
     ]
     pub_topics     = [
