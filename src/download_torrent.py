@@ -910,6 +910,12 @@ class TorrentDownloader(Downloader):
             if self.is_Paused():
                 rospy.loginfo('Re-starting torrents download')
                 self.unpause()
+                
+                
+                rospy.logdebug('Notifying download loop!')
+                with self.fsm_condition:
+                    self.fsm_condition.notifyAll()
+
             else:
                 rospy.logwarn('Not re-starting, current state is [%s]'%self.state)
         except Exception as inst:
