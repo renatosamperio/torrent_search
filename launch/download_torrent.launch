@@ -1,5 +1,5 @@
 <launch>
-  <param name="/download_torrent/download_time"  type="double" value="20.0" />
+  <param name="/download_torrent/download_time"  type="double" value="1800.0" />
   <param name="/download_torrent/download_pause" type="double" value="21600" />
 
   <node name="download_torrent" pkg="torrent_search" type="download_torrent.py" output="screen" args="--debug"/>
