@@ -1093,7 +1093,18 @@ class DownloaderFSM:
               ros_node.ParseException(inst)
         finally:
             return msg
-            
+
+    def set_download_pause(self, value):
+        preivous = self.fsm.alarm.download_pause
+        self.fsm.alarm.download_pause = value
+        rospy.logdebug('  Setting download_pause from [%f] to [%f]'%(preivous, value))
+
+    def set_download_time(self, value):
+        preivous = self.fsm.alarm.download_time
+        self.fsm.alarm.download_time = value
+        rospy.logdebug('  Setting download_time from [%f] to [%f]'%(preivous, value))
+
+
 class DownloadTorrent(ros_node.RosNode):
     def __init__(self, **kwargs):
         try:
@@ -1146,6 +1157,14 @@ class DownloadTorrent(ros_node.RosNode):
     def SubscribeCallback(self, msg, topic):
         try:
 
+            if 'download_time' in topic:
+                self.downloader.set_download_time(msg.data)
+                return
+            
+            if 'download_pause' in topic:
+                self.downloader.set_download_pause(msg.data)
+                return
+                
             ## Add item to queue
             self.queue.put((topic, msg))
 
