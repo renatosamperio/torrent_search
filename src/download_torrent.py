@@ -105,6 +105,7 @@ class Alarm:
     def download_timer(self, event):
         try:
             self.start_time = time.time()
+            self.elapsed_time = 0.0
             rate = rospy.Rate(4)
             rospy.logdebug('ALARM: Starting download alarm for %2.4fs'%self.download_time)
             self.is_running = True
@@ -152,10 +153,19 @@ class Alarm:
         except Exception as inst:
               ros_node.ParseException(inst)
         
-    def has_finished(self):
+    def finish_now(self):
         try:
             self.is_finished = True
             rospy.logdebug('ALARM: Setting alarm to be finished')
+        except Exception as inst:
+              ros_node.ParseException(inst)
+    
+    def has_time_finish(self):
+        try:
+            is_finished = self.elapsed_time > self.download_time
+            time_finished = 'has finished' if is_finished else 'has not yet finished'
+            rospy.logdebug('ALARM: Time %s'%time_finished)
+            return is_finished
         except Exception as inst:
               ros_node.ParseException(inst)
     
@@ -713,8 +723,12 @@ class TorrentDownloader(Downloader):
                         ## Update state in DB
                         self.update_db_state(torrent_hash, 'finished')
                         
-                        ## Stop alarm timer
-                        self.alarm.has_finished()
+                        ## Stop alarm timer if time has finished and no more 
+                        ##    torrents are available
+                        handles     = self.ses.get_torrents()
+                        num_handles = len(handles)
+                        if self.alarm.has_time_finish() and num_handles<1:
+                            self.alarm.finish_now()
                     
                     else:
                         rate.sleep()
