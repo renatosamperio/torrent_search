@@ -740,7 +740,8 @@ class TorrentDownloader(Downloader):
                         num_handles = len(handles)
                         if self.alarm.has_time_finish() and num_handles<1:
                             self.alarm.finish_now()
-                    
+                        
+                        break
                     else:
                         rate.sleep()
                 
