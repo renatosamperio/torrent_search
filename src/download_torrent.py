@@ -707,20 +707,23 @@ class TorrentDownloader(Downloader):
                     upload_rate     = status.upload_rate / 1000
                     num_peers       = status.num_peers
                     state           = self.get_state_str(status.state)
+                    
+                    if state == 'downloading metadata':
+                        rospy.loginfo('[%s] is %s'%(handle_name, state))
+                        continue
+
                     previous_state  = self.previous_state
                     current_state   = self.state
                     torrent_hash    = str(status.info_hash).upper()
                     
-                    rospy.loginfo('(%4.2f) [%s] %.2f%% complete (down: %.1f kb/s, up: %.1f kB/s, peers: %d) %s: [%s] -> [%s]'% (
+                    rospy.loginfo('(%4.2f) %.2f%% (down: %.1f kb/s, up: %.1f kB/s, peers: %d) %s: [%s] '% (
                         self.alarm.elapsed_time,
-                        handle_name,
                         progress, 
                         download_rate, 
                         upload_rate, 
                         num_peers, 
                         state,
-                        previous_state,
-                        current_state
+                        handle_name,
                     ))
                     
                     ## Remove torrent if it is already finished, 
