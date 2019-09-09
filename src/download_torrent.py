@@ -516,11 +516,14 @@ class TorrentDownloader(Downloader):
                 for torrent_data in torrent_info['torrents']:
                     if torrent_data['state']['status'] == 'selected':
 
+                        ## Looking for torrent metadata
+                        torrent_name = torrent_info['title_long']+'-'+torrent_data['quality']+'-'+torrent_data['type']
+                        rospy.logdebug('Looking torrent metadata for [%s]'%torrent_name)
                         all_ok = self.download_torrent_info(torrent_data)
                         if not all_ok:
-                            rospy.logwarn('  Meta data not available for [%s]'%torernt_name)
+                            rospy.logwarn('  Meta data not available for [%s]'%torrent_name)
                         else:
-                            rospy.loginfo('  Got metadata for [%s], starting torrent download...'%torernt_name)
+                            rospy.loginfo('  Got metadata for [%s], starting torrent download...'%torrent_name)
 
             ## Resume download quickly to add torrent
             if self.is_paused():
