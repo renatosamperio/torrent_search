@@ -349,6 +349,9 @@ class SlackPoster(object):
 class Downloader(object):
     def __init__(self, **kwargs):
         try:
+            self.ses                = None
+            self.params             = None
+            
             ## Automatic start and stop
             seconds_per_hour        = 3600
             self.download_time      = 0.5* seconds_per_hour #s
@@ -383,6 +386,42 @@ class Downloader(object):
     def client_stop_downloading(self):
         try:
             rospy.loginfo('client_stop_downloading, nothing to do')
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
+    def download_torrent_info(self, torrent_data):
+        try:
+            
+            if self.ses is None:
+                rospy.logwarn('Session not ready to download torrent info')
+                return False
+                
+            if self.params is None:
+                rospy.logwarn('Parameters not yet defined to add magnet')
+                return False
+            
+            ## Preparing to download torrent
+            num_handles = len(self.ses.get_torrents())
+            rospy.loginfo('  Preparing to download torrent [%s], current handles [%d]'%(torernt_name ,num_handles))
+            handle = lt.add_magnet_uri(self.ses, torrent_data['magnet'], self.params) 
+                        
+            rospy.loginfo('  Downloading metadata, current handles [%d]',num_handles)
+            metadata_trigger_time = time.time()
+            metadata_ready = True
+            metadata_expired = True
+            while (not handle.has_metadata() and metadata_expired): 
+                time.sleep(0.5)
+                metadata_expired = (time.time() - metadata_trigger_time) <= 60
+                #print "===> metadata_expired:", metadata_expired, self.handle.has_metadata()
+                
+            if not handle.has_metadata():
+                return False
+            
+            ## Setting up connection options
+            handle.set_upload_limit(self.up_limit)
+            handle.set_max_connections(self.max_connections)
+            
+            return True
         except Exception as inst:
               ros_node.ParseException(inst)
 
@@ -476,31 +515,12 @@ class TorrentDownloader(Downloader):
                 for torrent_data in torrent_info['torrents']:
                     if torrent_data['state']['status'] == 'selected':
 
-                        ## Preparing to download torrent
-                        torernt_name = torrent_info['title_long']+'-'+torrent_data['quality']+'-'+torrent_data['type']
-                        num_handles = len(self.ses.get_torrents())
-                        rospy.loginfo('  Preparing to download torrent [%s], current handles [%d]'%(torernt_name ,num_handles))
-                        handle = lt.add_magnet_uri(self.ses, torrent_data['magnet'], self.params) 
-                        
-                        num_handles = len(self.ses.get_torrents())
-                        rospy.loginfo('     Downloading metadata, current handles [%d]',num_handles)
-                        metadata_trigger_time = time.time()
-                        metadata_ready = True
-                        metadata_expired = True
-                        while (not handle.has_metadata() and metadata_expired): 
-                            time.sleep(0.5)
-                            metadata_expired = (time.time() - metadata_trigger_time) <= 60
-                            #print "===> metadata_expired:", metadata_expired, self.handle.has_metadata()
-                            
-                        if not handle.has_metadata():
+                        all_ok = self.download_torrent_info(torrent_data)
+                        if not all_ok:
                             rospy.logwarn('  Meta data not available for [%s]'%torernt_name)
                         else:
                             rospy.loginfo('  Got metadata for [%s], starting torrent download...'%torernt_name)
-                        
-                        ## Setting up connection options
-                        handle.set_upload_limit(self.up_limit)
-                        handle.set_max_connections(self.max_connections)
-            
+
             ## Resume download quickly to add torrent
             if self.is_paused():
                 rospy.loginfo('Download not started, pausing again session...')
@@ -529,14 +549,13 @@ class TorrentDownloader(Downloader):
                 for handle in handles:
                     status = handle.status()
                     hash = str(status.info_hash).upper()
-                    self.update_db_state(hash, 'downloading')
+                    self.update_db_state(hash, status)
                         
                 ## Verify is session isn't already downloading stuff...
                 if not self.download_started:
                     self.download_started = True
                     rospy.logdebug('---> Starting to download ['+self.previous_state+'] -> ['+self.state+']')
                     
-                
                     ## Downloading thread
                     rospy.Timer(rospy.Duration(0.5), self.downloader_thread, oneshot=True)
                 else:
@@ -716,7 +735,7 @@ class TorrentDownloader(Downloader):
                     current_state   = self.state
                     torrent_hash    = str(status.info_hash).upper()
                     
-                    rospy.loginfo('(%4.2f) %.2f%% (down: %.1f kb/s, up: %.1f kB/s, peers: %d) %s: [%s] '% (
+                    rospy.loginfo('(%4.2f) %3.2f%% (down: %.1f kb/s, up: %.1f kB/s, peers: %d) %s: [%s] '% (
                         self.alarm.elapsed_time,
                         progress, 
                         download_rate, 
