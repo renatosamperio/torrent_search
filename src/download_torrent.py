@@ -322,6 +322,7 @@ class SlackPoster(object):
                     response = self.slack_client.PostMessage(
                         self.slack_channel, "Torrent Download",
                         attachments = slack_message,
+                        as_user     = False,
                      
                     )
 
