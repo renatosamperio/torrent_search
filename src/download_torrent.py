@@ -401,8 +401,9 @@ class Downloader(object):
                 return False
             
             ## Preparing to download torrent
-            num_handles = len(self.ses.get_torrents())
-            rospy.loginfo('  Preparing to download torrent [%s], current handles [%d]'%(torernt_name ,num_handles))
+            handles = self.ses.get_torrents()
+            num_handles = len(handles)
+            rospy.logdebug('  Adding magnet URI, current handles [%d]'%(num_handles))
             handle = lt.add_magnet_uri(self.ses, torrent_data['magnet'], self.params) 
                         
             rospy.loginfo('  Downloading metadata, current handles [%d]',num_handles)
