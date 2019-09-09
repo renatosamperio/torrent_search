@@ -1003,6 +1003,10 @@ class DownloaderFSM:
             self.fsm.previous_state = self.fsm.state
             rospy.logdebug('Going to NEXT state, previous state: '+self.fsm.previous_state)
             
+            ## Starting timed download alarm
+            handles = self.ses.get_torrents()
+            num_handles = len(handles)
+
             ## Rotating FSM
             if next_state == 'configure':
                 self.fsm.configure(torrent=args['info'])
@@ -1015,8 +1019,20 @@ class DownloaderFSM:
             elif next_state == 'pause':
                 self.fsm.pause()
             elif next_state == 'unpause':
+                
+                ## There is nothing to download
+                if num_handles < 1:
+                    rospy.logdebug('Keeping paused, nothing to download')
+                    return
+                
                 self.fsm.unpause()
             elif next_state == 'remove_pause':
+                
+                ## There is nothing to download
+                if num_handles < 1:
+                    rospy.logdebug('Keeping paused, nothing to download')
+                    return
+                
                 self.fsm.remove_pause()
             elif next_state == 'done':
                 self.fsm.done()
