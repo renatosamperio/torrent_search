@@ -742,7 +742,9 @@ class TorrentDownloader(Downloader):
                         ##    torrents are available
                         handles     = self.ses.get_torrents()
                         num_handles = len(handles)
-                        if self.alarm.has_time_finish() and num_handles<1:
+                        
+                        if num_handles<1:
+                            rospy.logdebug('Stopping downloading timer alarm')
                             self.alarm.finish_now()
                         
                         break
@@ -1004,7 +1006,7 @@ class DownloaderFSM:
             rospy.logdebug('Going to NEXT state, previous state: '+self.fsm.previous_state)
             
             ## Starting timed download alarm
-            handles = self.ses.get_torrents()
+            handles = self.fsm.ses.get_torrents()
             num_handles = len(handles)
 
             ## Rotating FSM
