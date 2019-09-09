@@ -389,42 +389,132 @@ class Downloader(object):
         except Exception as inst:
               ros_node.ParseException(inst)
 
-    def download_torrent_info(self, torrent_data):
+class MetaDataDownloader(object):
+    def __init__(self, **kwargs):
+        
         try:
+            self.torrent_info     = None
+            self.index            = None
+            self.downloader       = None
+            self.session          = None
+            self.has_requested    = False
+            self.id               = None
+            self.torrents_tracker = {}
             
-            if self.ses is None:
-                rospy.logwarn('Session not ready to download torrent info')
-                return False
-                
-            if self.params is None:
-                rospy.logwarn('Parameters not yet defined to add magnet')
-                return False
+            for key, value in kwargs.iteritems():
+                if "torrent_info" == key:
+                    self.torrent_info = value
+                elif "index" == key:
+                    self.index = value
+                elif "downloader" == key:
+                    self.downloader = value
+                elif "id" == key:
+                    self.id = value
+                    
             
-            ## Preparing to download torrent
-            handles = self.ses.get_torrents()
-            num_handles = len(handles)
-            rospy.logdebug('  Adding magnet URI, current handles [%d]'%(num_handles))
-            handle = lt.add_magnet_uri(self.ses, torrent_data['magnet'], self.params) 
-                        
-            rospy.loginfo('  Downloading metadata, current handles [%d]',num_handles)
-            metadata_trigger_time = time.time()
-            metadata_ready = True
-            metadata_expired = True
-            while (not handle.has_metadata() and metadata_expired): 
-                time.sleep(0.5)
-                metadata_expired = (time.time() - metadata_trigger_time) <= 60
-                #print "===> metadata_expired:", metadata_expired, self.handle.has_metadata()
-                
-            if not handle.has_metadata():
-                return False
+            self.torrent_data = self.torrent_info['torrents'][self.index]
             
-            ## Setting up connection options
-            handle.set_upload_limit(self.up_limit)
-            handle.set_max_connections(self.max_connections)
-            
-            return True
+            self.trigger_metadata_download()
         except Exception as inst:
               ros_node.ParseException(inst)
+        
+    def download_torrent_info(self, event):
+        try:
+            session         = self.downloader.ses
+            params          = self.downloader.params
+            up_limit        = self.downloader.up_limit
+            max_connections = self.downloader.max_connections
+
+            if session is None:
+                rospy.logwarn('  [%d] Session not ready to download torrent info'%self.id)
+                self.torrents_tracker['metadata']['has_metadata'] = False
+                
+            if params is None:
+                rospy.logwarn('  [%d] Parameters not yet defined to add magnet'%self.id)
+                self.torrents_tracker['metadata']['has_metadata'] = False
+            
+            ## Preparing to download torrent
+            handles     = session.get_torrents()
+            num_handles = len(handles)
+            handle      = lt.add_magnet_uri(session, self.torrent_data['magnet'], params) 
+            rospy.logdebug('  [%d] Adding magnet URI, current handles [%d]'%(self.id, num_handles))
+                        
+            rospy.loginfo('  [%d] Downloading metadata, current handles [%d]'%(self.id, num_handles))
+            metadata_trigger_time = time.time()
+            
+            ## Collecting downloading data
+            self.torrents_tracker['metadata']['retries'] += 1
+            self.torrents_tracker['metadata']['retry_ts'] = time.time()
+            
+            ## Downloading data
+            metadata_expired = True
+            has_metadata = handle.has_metadata()
+            while (not has_metadata and metadata_expired): 
+                self.torrents_tracker['metadata']['is_searching'] = True
+                time.sleep(0.5)
+                metadata_expired = (time.time() - metadata_trigger_time) <= 60
+                has_metadata = handle.has_metadata()
+                #print "---> metadata_expired:", metadata_expired, has_metadata
+                
+            label = 'has metadata'
+            if not has_metadata:
+                label = 'expired without metadata'
+            rospy.loginfo('  [%d] Tracker %s'%(self.id, label))
+            
+            ## Setting up connection options
+            handle.set_upload_limit(up_limit)
+            handle.set_max_connections(max_connections)
+            
+            ## All went fine!
+            self.torrents_tracker['metadata']['has_metadata'] = has_metadata
+            self.torrents_tracker['metadata']['is_searching'] = False
+            self.has_requested = True
+
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
+    def trigger_metadata_download(self):
+        try:
+            torrent_data = self.torrent_info['torrents'][self.index]
+            hash = torrent_data['hash']
+            
+            torrent_name = self.torrent_info['title_long']+'-'+torrent_data['quality']+'-'+torrent_data['type']
+            rospy.logdebug('  [%d] Looking torrent metadata for [%s]'%(self.id, torrent_name))
+            
+            ## Setting up local state
+            if hash not in self.downloader.torrents_tracker:
+                rospy.logdebug('  [%d] Added tracking locally for %s'%(self.id, hash))
+                self.torrents_tracker.update({
+                        'hash':             hash,
+                        'state':            'search metadata',
+                        'name':             torrent_name,
+                        'metadata':{
+                            'has_metadata': False,
+                            'retries':      0,
+                            'retry_ts':     None,
+                            'is_searching': False
+                        }
+                     
+                })
+#             all_ok = self.download_torrent_info(torrent_data)
+#             if not all_ok:
+#                 rospy.logwarn('  Meta data not available for [%s]'%torrent_name)
+#             else:
+#                 rospy.loginfo('  Got metadata for [%s], starting torrent download...'%torrent_name)
+                            
+            timer = rospy.Timer(rospy.Duration(0.025), self.download_torrent_info, oneshot=True )
+            return timer
+        except Exception as inst:
+              ros_node.ParseException(inst)
+    
+    def has_metadata(self):
+        return self.torrents_tracker['metadata']['has_metadata']
+
+    def is_searching(self):
+        return self.torrents_tracker['metadata']['is_searching']
+    
+    def is_finished(self):
+        return self.has_requested
 
 class TorrentDownloader(Downloader):
     def __init__(self, **kwargs):
@@ -1177,7 +1267,6 @@ class DownloaderFSM:
         preivous = self.fsm.alarm.download_time
         self.fsm.alarm.download_time = value
         rospy.logdebug('  Setting download_time from [%f] to [%f]'%(preivous, value))
-
 
 class DownloadTorrent(ros_node.RosNode):
     def __init__(self, **kwargs):
