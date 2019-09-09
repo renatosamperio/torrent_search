@@ -706,6 +706,9 @@ class TorrentDownloader(Downloader):
             if num_handles>0:
                 self.alarm.start()
             
+            ## Create a local download tracking container
+            current_handles = {}
+            
             while num_handles>0:
                 if self.state == 'Paused':
                     with self.fsm_condition:
@@ -731,7 +734,26 @@ class TorrentDownloader(Downloader):
                     download_rate   = status.download_rate / 1000
                     upload_rate     = status.upload_rate / 1000
                     num_peers       = status.num_peers
+                    torrent_hash    = str(status.info_hash).upper()
                     state           = self.get_state_str(status.state)
+                    
+                    if torrent_hash not in current_handles:
+                        rospy.logdebug('Tracking locally state for %s'%handle_name)
+                        current_handles.update({
+                            torrent_hash: {
+                                'state': state,
+                                'name': handle_name
+                            }
+                        })
+                    ## State has been changed while downloading
+                    elif current_handles[torrent_hash]['state'] != state:
+                        rospy.logdebug('State of [%s] has changed from [%s] to [%s] while downloading'%
+                                       (current_handles[torrent_hash]['name'], 
+                                        current_handles[torrent_hash]['state'], state))
+
+                        self.update_db_state(torrent_hash, state)
+                        current_handles[torrent_hash]['state'] = state
+                    
                     
                     if state == 'downloading metadata':
                         rospy.loginfo('[%s] is %s'%(handle_name, state))
@@ -739,7 +761,6 @@ class TorrentDownloader(Downloader):
 
                     previous_state  = self.previous_state
                     current_state   = self.state
-                    torrent_hash    = str(status.info_hash).upper()
                     
                     rospy.loginfo('(%4.2f) %3.2f%% (down: %.1f kb/s, up: %.1f kB/s, peers: %d) %s: [%s] '% (
                         self.alarm.elapsed_time,
@@ -772,6 +793,11 @@ class TorrentDownloader(Downloader):
                             rospy.logdebug('Stopping downloading timer alarm')
                             self.alarm.finish_now()
                         
+                        
+                        ## Removing torrent local info
+                        rospy.logdebug('Removing local info for [%s]'%
+                                       current_handles[torrent_hash]['name'])
+                        del current_handles[torrent_hash]
                         break
                     else:
                         rate.sleep()
