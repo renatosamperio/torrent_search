@@ -637,14 +637,14 @@ class TorrentDownloader(Downloader):
             ## Waiting to download metadata
             rospy.loginfo('Waiting to download metadata')
             rate = rospy.Rate(1.0)
-            while True:
-                all_are_finished = True
-                for timer in timers:
-                    all_are_finished = all_are_finished and timer.is_finished()
-                
-                if all_are_finished: break
-                rate.sleep()
             
+            all_are_finished = False
+            while not all_are_finished:
+                rate.sleep()
+                for timer in timers:
+                    all_are_finished = timer.is_finished()
+                    if all_are_finished: break
+
             ## Resume download quickly to add torrent
             if self.is_paused():
                 rospy.loginfo('Download not started, pausing again session...')
@@ -875,7 +875,7 @@ class TorrentDownloader(Downloader):
                         
                         if self.torrents_tracker[torrent_hash]['name'] is None:
                             self.torrents_tracker[torrent_hash]['name'] = handle_name
-                            pprint(self.torrents_tracker[torrent_hash])
+
                     ## Updating torrents that had not download metadata
                     if state == 'downloading metadata':
                         rospy.loginfo('[%s] is %s'%(handle_name, state))
