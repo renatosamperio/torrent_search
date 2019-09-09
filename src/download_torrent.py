@@ -599,22 +599,51 @@ class TorrentDownloader(Downloader):
             
             ## FSM transition status
             rospy.logdebug('---> Setting up configuration ['+self.previous_state+'] -> ['+self.state+']')
+            timers = []
             
             ## Looking for selected torrents
-            for torrent_info in torrent['torrent_items']:
+            for id in range(len(torrent['torrent_items'])):
+                torrent_info = torrent['torrent_items'][id]
                 rospy.logdebug('Setting up [%s] to download'%torrent_info['title_long'])
-                for torrent_data in torrent_info['torrents']:
+                for i in range(len(torrent_info['torrents'])):
+                    torrent_data = torrent_info['torrents'][i]
                     if torrent_data['state']['status'] == 'selected':
 
-                        ## Looking for torrent metadata
-                        torrent_name = torrent_info['title_long']+'-'+torrent_data['quality']+'-'+torrent_data['type']
-                        rospy.logdebug('Looking torrent metadata for [%s]'%torrent_name)
-                        all_ok = self.download_torrent_info(torrent_data)
-                        if not all_ok:
-                            rospy.logwarn('  Meta data not available for [%s]'%torrent_name)
-                        else:
-                            rospy.loginfo('  Got metadata for [%s], starting torrent download...'%torrent_name)
+                        ## Creating a metadata download thread
+                        args = {
+                            'torrent_info': torrent_info, 
+                            'index': i, 
+                            'session': self.ses,
+                            'downloader': self,
+                            'id' : id
+                        }
+                        downloader = MetaDataDownloader(**args)
+                        timers.append(downloader)
+                        
+                        ## Assigning meta data thread
+                        if torrent_data['hash'] not in self.torrents_tracker:
+                            rospy.logdebug('Tracking locally state with metadata downloader for %s'%torrent_data['hash'])
+                            self.torrents_tracker.update({
+                                torrent_data['hash']: {
+                                    'state': '   search_metadata',
+                                    'name':      None,
+                                    'metadata':  downloader
+                                }
+                            })
 
+                        time.sleep(0.25)
+                        
+            ## Waiting to download metadata
+            rospy.loginfo('Waiting to download metadata')
+            rate = rospy.Rate(1.0)
+            while True:
+                all_are_finished = True
+                for timer in timers:
+                    all_are_finished = all_are_finished and timer.is_finished()
+                
+                if all_are_finished: break
+                rate.sleep()
+            
             ## Resume download quickly to add torrent
             if self.is_paused():
                 rospy.loginfo('Download not started, pausing again session...')
@@ -623,6 +652,7 @@ class TorrentDownloader(Downloader):
                 return
             
             ## Moving to next state
+            rospy.logdebug('Starting download')
             self.download()
             
         except Exception as inst:
