@@ -552,8 +552,9 @@ class TorrentDownloader(Downloader):
                     
                 for handle in handles:
                     status = handle.status()
+                    state  = self.get_state_str(status.state)
                     hash = str(status.info_hash).upper()
-                    self.update_db_state(hash, status)
+                    self.update_db_state(hash, state)
                         
                 ## Verify is session isn't already downloading stuff...
                 if not self.download_started:
@@ -695,8 +696,9 @@ class TorrentDownloader(Downloader):
             handles = self.ses.get_torrents()
             for handle in handles:
                 status = handle.status()
+                state  = self.get_state_str(status.state)
                 hash = str(status.info_hash).upper()
-                self.update_db_state(hash, 'downloading')
+                self.update_db_state(hash, state)
 
             ## Starting timed download alarm
             handles = self.ses.get_torrents()
