@@ -429,10 +429,12 @@ class MetaDataDownloader(object):
             if session is None:
                 rospy.logwarn('  [%d] Session not ready to download torrent info'%self.id)
                 self.torrents_tracker['metadata']['has_metadata'] = False
+                return
                 
             if params is None:
                 rospy.logwarn('  [%d] Parameters not yet defined to add magnet'%self.id)
                 self.torrents_tracker['metadata']['has_metadata'] = False
+                return
             
             ## Preparing to download torrent
             handles     = session.get_torrents()
@@ -480,7 +482,7 @@ class MetaDataDownloader(object):
             hash = torrent_data['hash']
             
             torrent_name = self.torrent_info['title_long']+'-'+torrent_data['quality']+'-'+torrent_data['type']
-            rospy.logdebug('  [%d] Looking torrent metadata for [%s]'%(self.id, torrent_name))
+            rospy.logdebug('  [%d] Looking for torrent metadata for [%s]'%(self.id, torrent_name))
             
             ## Setting up local state
             if hash not in self.downloader.torrents_tracker:
@@ -497,6 +499,8 @@ class MetaDataDownloader(object):
                         }
                      
                 })
+            else:
+                rospy.loginfo('  [%d] Tracker  [%s] already in local state'%(self.id, torrent_name))
 #             all_ok = self.download_torrent_info(torrent_data)
 #             if not all_ok:
 #                 rospy.logwarn('  Meta data not available for [%s]'%torrent_name)
@@ -585,12 +589,12 @@ class TorrentDownloader(Downloader):
             if state < len(self.state_str):
                 return self.state_str[state]
             else:
-                rospy.logdebug('Unrecognised state: '+str(state) )
+                rospy.loginfo('Unrecognised state (%s): %s'%(str(state), str(state)) )
                 return str(state)
         except Exception as inst:
               ros_node.ParseException(inst)
 
-    def set_up_configuration(self, torrent=None): 
+    def set_up_configuration(self, torrent=None):
         try:
             if torrent is None:
                 rospy.logwarn ('Setting up torrent failed as no torrent info was provided')
@@ -605,7 +609,7 @@ class TorrentDownloader(Downloader):
             ## Looking for selected torrents
             for id in range(len(torrent['torrent_items'])):
                 torrent_info = torrent['torrent_items'][id]
-                rospy.logdebug('Setting up [%s] to download'%torrent_info['title_long'])
+                rospy.loginfo('Setting up [%s] to download'%torrent_info['title_long'])
                 for i in range(len(torrent_info['torrents'])):
                     torrent_data = torrent_info['torrents'][i]
                     if torrent_data['state']['status'] == 'selected':
@@ -623,7 +627,7 @@ class TorrentDownloader(Downloader):
                         
                         ## Assigning meta data thread
                         if torrent_data['hash'] not in self.torrents_tracker:
-                            rospy.logdebug('Tracking locally state with metadata downloader for %s'%torrent_data['hash'])
+                            rospy.logdebug('Tracking state locally for %s'%torrent_data['hash'])
                             self.torrents_tracker.update({
                                 torrent_data['hash']: {
                                     'state': '   search_metadata',
@@ -1373,7 +1377,7 @@ class DownloadTorrent(ros_node.RosNode):
     def Run(self, event):
         ''' Run method '''
         try:
-            rospy.logdebug('Running FSM')
+            rospy.loginfo('Running FSM')
             while not rospy.is_shutdown():
                 ## Wait for being notified that a message
                 ##    has arrived
