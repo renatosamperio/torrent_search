@@ -612,8 +612,9 @@ class TorrentDownloader(Downloader):
                 rospy.loginfo('Setting up [%s] to download'%torrent_info['title_long'])
                 for i in range(len(torrent_info['torrents'])):
                     torrent_data = torrent_info['torrents'][i]
-                    if torrent_data['state']['status'] == 'selected':
-
+                    if (torrent_data['state']['status'] == 'selected' and 
+                        not self.is_downloading_torrent(torrent_data['hash']) ):
+                        
                         ## Creating a metadata download thread
                         args = {
                             'torrent_info': torrent_info, 
@@ -811,6 +812,16 @@ class TorrentDownloader(Downloader):
         except Exception as inst:
             ros_node.ParseException(inst)
 
+    def is_downloading_torrent(self, hash):
+        try:
+            torrents_hash = self.torrents_tracker.keys()
+            for torrent_hash in torrents_hash:
+                if hash == torrent_hash:
+                    return True
+            return False
+        except Exception as inst:
+            ros_node.ParseException(inst)
+        
     def downloader_thread(self, event):
         ''' Run method '''
         try:
