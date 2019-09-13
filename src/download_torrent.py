@@ -606,9 +606,11 @@ class TorrentDownloader(Downloader):
                 torrent_info = torrent['torrent_items'][id]
                 rospy.loginfo('Setting up [%s] to download'%torrent_info['title_long'])
                 for i in range(len(torrent_info['torrents'])):
-                    torrent_data = torrent_info['torrents'][i]
-                    if (torrent_data['state']['status'] == 'selected' and 
-                        not self.is_downloading_torrent(torrent_data['hash']) ):
+                    torrent_data     = torrent_info['torrents'][i]
+                    selected_torrent = torrent_data['state']['status'] == 'selected'
+                    is_downlading    = self.is_downloading_torrent(torrent_data['hash'])
+                    
+                    if (selected_torrent and not is_downlading ):
                         
                         ## Creating a metadata download thread
                         rospy.logdebug('Downloading metadata in a separate thread')
