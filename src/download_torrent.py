@@ -501,11 +501,6 @@ class MetaDataDownloader(object):
                 })
             else:
                 rospy.loginfo('  [%d] Tracker  [%s] already in local state'%(self.id, torrent_name))
-#             all_ok = self.download_torrent_info(torrent_data)
-#             if not all_ok:
-#                 rospy.logwarn('  Meta data not available for [%s]'%torrent_name)
-#             else:
-#                 rospy.loginfo('  Got metadata for [%s], starting torrent download...'%torrent_name)
                             
             timer = rospy.Timer(rospy.Duration(0.025), self.download_torrent_info, oneshot=True )
             return timer
@@ -590,7 +585,7 @@ class TorrentDownloader(Downloader):
                 return self.state_str[state]
             else:
                 rospy.loginfo('Unrecognised state (%s): %s'%(str(state), str(state)) )
-                return str(state)
+                return str(state).strip()
         except Exception as inst:
               ros_node.ParseException(inst)
 
@@ -616,6 +611,7 @@ class TorrentDownloader(Downloader):
                         not self.is_downloading_torrent(torrent_data['hash']) ):
                         
                         ## Creating a metadata download thread
+                        rospy.logdebug('Downloading metadata in a separate thread')
                         args = {
                             'torrent_info': torrent_info, 
                             'index': i, 
@@ -626,7 +622,7 @@ class TorrentDownloader(Downloader):
                         downloader = MetaDataDownloader(**args)
                         timers.append(downloader)
                         
-                        ## Assigning meta data thread
+                        ## Assigning meta data thread 
                         if torrent_data['hash'] not in self.torrents_tracker:
                             rospy.logdebug('Tracking state locally for %s'%torrent_data['hash'])
                             self.torrents_tracker.update({
@@ -894,17 +890,31 @@ class TorrentDownloader(Downloader):
                     ## Updating torrents that had not download metadata
                     if state == 'downloading metadata':
                         rospy.loginfo('[%s] is %s'%(handle_name, state))
+                        tracker = self.torrents_tracker[torrent_hash]['metadata']
+                        pprint(tracker.torrents_tracker)
+                        rospy.logdebug("===> name: %s" % tracker.torrents_tracker['name'])
+                        rospy.logdebug("===> is_finished: %s" %str( tracker.is_finished()) )
+                        rospy.logdebug("===> has_metadata:  %s"%str( tracker.has_metadata()) ) 
+                        rospy.logdebug("===> time_last_update: %f" %( time_last_update))
+#                         {'hash': u'4853EF54A80C624481C9021EB933FE9D20D9795C',
+#                          'metadata': {'has_metadata': False,
+#                                       'is_searching': True,
+#                                       'retries': 1,
+#                                       'retry_ts': 1568147504.86465},
+#                          'name': u'Tone-Deaf (2019)-720p-web',
+#                          'state': 'search metadata'}
                         continue
 
                     previous_state  = self.previous_state
                     current_state   = self.state
                     
-                    rospy.loginfo('(%4.2f) %3.2f%% (down: %.1f kb/s, up: %.1f kB/s, peers: %d) %s: [%s] '% (
+                    rospy.loginfo('(%4.2f) %3.2f%% [down: %.1f kb/s, up: %.1f kB/s, peers: %d, seeds: %d] %s: [%s] '% (
                         self.alarm.elapsed_time,
                         progress, 
                         download_rate, 
                         upload_rate, 
                         num_peers, 
+                        num_seeds,
                         state,
                         handle_name,
                     ))
@@ -974,12 +984,15 @@ class TorrentDownloader(Downloader):
                 for item in history:
                     if item['operation'] == state:
                         return False
+                    rospy.logdebug('    State ignored [%s]'%str(item['operation']))
                 
+                rospy.logdebug('    State [%s] not found'%state)
                 return True
             except Exception as inst:
                 ros_node.ParseException(inst)
         
         try:
+            target_state = target_state.strip()
             if len(target_state)<1:
                 rospy.logwarn('Not possible to update DB, invalid target')
                 return
@@ -1427,6 +1440,7 @@ class DownloadTorrent(ros_node.RosNode):
 
                 ## Going to next state with input data
                 args = {'info': msg}
+                rospy.logdebug('Setting up FSM state [%s]'%next_state)
                 self.downloader.next(next_state, **args)
 
         except Exception as inst:
