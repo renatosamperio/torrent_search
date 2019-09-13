@@ -636,17 +636,21 @@ class TorrentDownloader(Downloader):
                             })
 
                         time.sleep(0.25)
-                        
-            ## Waiting to download metadata
-            rospy.loginfo('Waiting to download metadata')
-            rate = rospy.Rate(1.0)
-            
-            all_are_finished = False
-            while not all_are_finished:
-                rate.sleep()
-                for timer in timers:
-                    all_are_finished = timer.is_finished()
-                    if all_are_finished: break
+            downloading_torrents=len(timers)
+            rospy.loginfo('Metadata downloading for [%d] torrents'%downloading_torrents)
+
+            ## Waiting to download metadata for timers...
+            if downloading_torrents>0:
+                rospy.loginfo('Waiting to download metadata')
+                rate = rospy.Rate(1.0)
+                
+                all_are_finished = False
+                while not all_are_finished:
+                    rate.sleep()
+                    for timer in timers:
+                        all_are_finished = timer.is_finished()
+                        if all_are_finished: break
+                rospy.logdebug('Metadata collected')
 
             ## Resume download quickly to add torrent
             if self.is_paused():
