@@ -865,12 +865,13 @@ class TorrentDownloader(Downloader):
                     download_rate   = status.download_rate / 1000
                     upload_rate     = status.upload_rate / 1000
                     num_peers       = status.num_peers
+                    num_seeds       = status.num_seeds
                     torrent_hash    = str(status.info_hash).upper()
                     state           = self.get_state_str(status.state)
                     
                     ## Looking if torrent ID exists locally
-                    if torrent_hash not in self.torrents_tracker:
-                        rospy.logdebug('Tracking locally state for %s'%handle_name)
+                    if torrent_hash not in self.torrents_tracker.keys():
+                        rospy.logdebug('Keeping locally torrent state for %s'%handle_name)
                         self.torrents_tracker.update({
                             torrent_hash: {
                                 'state': state,
@@ -879,6 +880,9 @@ class TorrentDownloader(Downloader):
                         })
                     ## Updating state if it has changed while downloading
                     elif self.torrents_tracker[torrent_hash]['state'] != state:
+                        if self.torrents_tracker[torrent_hash]['name'] is None:
+                            self.torrents_tracker[torrent_hash]['name'] = handle_name
+
                         rospy.logdebug('State of [%s] has changed from [%s] to [%s] while downloading'%
                                        (self.torrents_tracker[torrent_hash]['name'], 
                                         self.torrents_tracker[torrent_hash]['state'], state))
@@ -886,11 +890,12 @@ class TorrentDownloader(Downloader):
                         self.update_db_state(torrent_hash, state)
                         self.torrents_tracker[torrent_hash]['state'] = state
                         
-                        if self.torrents_tracker[torrent_hash]['name'] is None:
-                            self.torrents_tracker[torrent_hash]['name'] = handle_name
-
                     ## Updating torrents that had not download metadata
                     if state == 'downloading metadata':
+                        time_last_update = time.time() - tracker.torrents_tracker['metadata']['retry_ts']
+                        if time_last_update > 60.0:
+                            rospy.logwarn('Torrent [%s] metadata not downloaded after [%s]'%
+                                          (tracker.torrents_tracker['name'], time_last_update))
                         rospy.loginfo('[%s] is %s'%(handle_name, state))
                         tracker = self.torrents_tracker[torrent_hash]['metadata']
                         pprint(tracker.torrents_tracker)
@@ -945,8 +950,8 @@ class TorrentDownloader(Downloader):
                         
                         ## Removing torrent local info
                         rospy.logdebug('Removing local info for [%s]'%
-                                       current_handles[torrent_hash]['name'])
-                        del current_handles[torrent_hash]
+                                       self.torrents_tracker[torrent_hash]['name'])
+                        del self.torrents_tracker[torrent_hash]
                         break
                     else:
                         rate.sleep()
