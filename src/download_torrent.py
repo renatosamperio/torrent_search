@@ -816,11 +816,7 @@ class TorrentDownloader(Downloader):
 
     def is_downloading_torrent(self, hash):
         try:
-            torrents_hash = self.torrents_tracker.keys()
-            for torrent_hash in torrents_hash:
-                if hash == torrent_hash:
-                    return True
-            return False
+            return hash in self.torrents_tracker.keys()
         except Exception as inst:
             ros_node.ParseException(inst)
         
