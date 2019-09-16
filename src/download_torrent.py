@@ -645,12 +645,18 @@ class TorrentDownloader(Downloader):
                 rate = rospy.Rate(1.0)
                 
                 all_are_finished = False
+                label = 'not '
                 while not all_are_finished:
                     rate.sleep()
                     for timer in timers:
+                        ## Wait until at least metadata of
+                        ##  one torrent has been download
                         all_are_finished = timer.is_finished()
-                        if all_are_finished: break
-                rospy.logdebug('Metadata collected')
+                        if all_are_finished: 
+                            label = ''
+                            break
+                
+                rospy.logdebug('Metadata %scollected'%label)
 
             ## Resume download quickly to add torrent
             if self.is_paused():
@@ -892,24 +898,11 @@ class TorrentDownloader(Downloader):
                         
                     ## Updating torrents that had not download metadata
                     if state == 'downloading metadata':
+                        tracker = self.torrents_tracker[torrent_hash]['metadata']
                         time_last_update = time.time() - tracker.torrents_tracker['metadata']['retry_ts']
                         if time_last_update > 60.0:
-                            rospy.logwarn('Torrent [%s] metadata not downloaded after [%s]'%
-                                          (tracker.torrents_tracker['name'], time_last_update))
-                        rospy.loginfo('[%s] is %s'%(handle_name, state))
-                        tracker = self.torrents_tracker[torrent_hash]['metadata']
-                        pprint(tracker.torrents_tracker)
-                        rospy.logdebug("===> name: %s" % tracker.torrents_tracker['name'])
-                        rospy.logdebug("===> is_finished: %s" %str( tracker.is_finished()) )
-                        rospy.logdebug("===> has_metadata:  %s"%str( tracker.has_metadata()) ) 
-                        rospy.logdebug("===> time_last_update: %f" %( time_last_update))
-#                         {'hash': u'4853EF54A80C624481C9021EB933FE9D20D9795C',
-#                          'metadata': {'has_metadata': False,
-#                                       'is_searching': True,
-#                                       'retries': 1,
-#                                       'retry_ts': 1568147504.86465},
-#                          'name': u'Tone-Deaf (2019)-720p-web',
-#                          'state': 'search metadata'}
+                            rospy.logwarn('After [%s]s expired waiting time to download metadata for torrent [%s]'%
+                                          (time_last_update, tracker.torrents_tracker['name']))
                         continue
 
                     previous_state  = self.previous_state
@@ -990,6 +983,7 @@ class TorrentDownloader(Downloader):
             try:
                 for item in history:
                     if item['operation'] == state:
+                        rospy.logdebug('    State found [%s]'%str(item['operation']))
                         return False
                     rospy.logdebug('    State ignored [%s]'%str(item['operation']))
                 
