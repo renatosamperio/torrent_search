@@ -942,7 +942,8 @@ class TorrentDownloader(Downloader):
                         rospy.loginfo('Removing handle [%s] from session'%handle_name)
                         
                         ## Update state in DB
-                        self.update_db_state(torrent_hash, 'finished')
+                        download_info = {'files': self.torrents_tracker[torrent_hash]['files']}
+                        self.update_db_state(torrent_hash, 'finished', extra=download_info)
                         
                         ## Stop alarm timer if time has finished and no more 
                         ##    torrents are available
@@ -991,11 +992,12 @@ class TorrentDownloader(Downloader):
         except Exception as inst:
             ros_node.ParseException(inst)
 
-    def update_db_state(self, hash, target_state, debug_=False):
+    def update_db_state(self, hash, target_state, extra=None, debug_=False):
         def has_state_in_history(state, history):
             try:
                 for item in history:
                     if item['operation'] == state:
+                        rospy.logdebug('    State found [%s]'%str(item['operation']))
                         return False
                     rospy.logdebug('    State ignored [%s]'%str(item['operation']))
                 
@@ -1064,6 +1066,14 @@ class TorrentDownloader(Downloader):
                     else:
                         rospy.logdebug('    Queried DB state [%s] is already defined for item [%s]'%
                                       (target_state, hash))
+                        
+                    if extra is not None:
+                        element.update(extra)
+                        query = {'id': element['id']}
+                        rospy.loginfo('  Updating DB extra values for [%s]'%(element['id']))
+                        updated_was_ok = self.db_handler.Update(query, element, upsertValue=True)
+                        label = 'updated successfully' if updated_was_ok else 'was not updated'
+                        rospy.logdebug('    Extra info was %s in [%s]'%( label, hash) )
                         
 
                     ## 2) Update state in a local copy
