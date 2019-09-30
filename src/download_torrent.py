@@ -896,25 +896,27 @@ class TorrentDownloader(Downloader):
                         
                     ## Updating torrents that had not download metadata
                     if state == 'downloading metadata':
+                        tracker = self.torrents_tracker[torrent_hash]['metadata']
                         time_last_update = time.time() - tracker.torrents_tracker['metadata']['retry_ts']
                         if time_last_update > 60.0:
-                            rospy.logwarn('Torrent [%s] metadata not downloaded after [%s]'%
-                                          (tracker.torrents_tracker['name'], time_last_update))
-                        rospy.loginfo('[%s] is %s'%(handle_name, state))
-                        tracker = self.torrents_tracker[torrent_hash]['metadata']
-                        pprint(tracker.torrents_tracker)
-                        rospy.logdebug("===> name: %s" % tracker.torrents_tracker['name'])
-                        rospy.logdebug("===> is_finished: %s" %str( tracker.is_finished()) )
-                        rospy.logdebug("===> has_metadata:  %s"%str( tracker.has_metadata()) ) 
-                        rospy.logdebug("===> time_last_update: %f" %( time_last_update))
-#                         {'hash': u'4853EF54A80C624481C9021EB933FE9D20D9795C',
-#                          'metadata': {'has_metadata': False,
-#                                       'is_searching': True,
-#                                       'retries': 1,
-#                                       'retry_ts': 1568147504.86465},
-#                          'name': u'Tone-Deaf (2019)-720p-web',
-#                          'state': 'search metadata'}
+                            rospy.logwarn('After [%s]s expired waiting time to download metadata for torrent [%s]'%
+                                          (time_last_update, tracker.torrents_tracker['name']))
                         continue
+
+                    if 'files' not in self.torrents_tracker.keys():
+                        torinfo = handle.get_torrent_info()
+                        files = torinfo.files()
+                        torrent_files = []
+                        for file in files:
+                            torrent_files.append(file.path)
+                        if len(torrent_files)>0:
+                            rospy.logdebug('Setting [%d] torrent files for [%s]'%
+                                           (len(torrent_files), self.torrents_tracker[torrent_hash]['name']))
+                            self.torrents_tracker[torrent_hash].update({
+                                'files':torrent_files
+                            })
+                        else:
+                            rospy.logdebug('No files found for [%s]'%self.torrents_tracker[torrent_hash]['name'])
 
                     previous_state  = self.previous_state
                     current_state   = self.state
@@ -1092,10 +1094,13 @@ class TorrentDownloader(Downloader):
                 for torrent in  torrent_state['torrents']:
                     if torrent['hash'] == hash:
                         if torrent['state']['status'] != target_state:
-#                             
+
                             torrent['state']['status'] = target_state
                             torrent['state']['history'].append( set_history(target_state) )
-                            rospy.logdebug('    Updated local state [%s] updated for [%s]'%(target_state, hash))
+                            rospy.logdebug('    Updated local state [%s] updated for [%s]'%
+                                           (target_state, hash))
+                            
+                            
                         else:
                             rospy.logdebug('    Local state [%s] already updated for [%s]'%
                                            (target_state, hash))
