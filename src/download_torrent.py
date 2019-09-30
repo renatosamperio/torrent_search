@@ -645,12 +645,16 @@ class TorrentDownloader(Downloader):
                 rate = rospy.Rate(1.0)
                 
                 all_are_finished = False
+                label = ''
                 while not all_are_finished:
                     rate.sleep()
                     for timer in timers:
                         all_are_finished = timer.is_finished()
-                        if all_are_finished: break
-                rospy.logdebug('Metadata collected')
+                        if all_are_finished: 
+                            label = 'not '
+                            break
+                
+                rospy.logdebug('Metadata %scollected'%label)
 
             ## Resume download quickly to add torrent
             if self.is_paused():
