@@ -1,0 +1,7 @@
+int8 STANDBY=0
+int8 PAUSED=1
+int8 DOWNLOADING_TORRENT=2
+int8 FINISHED_TORRENT=3
+
+int8    state
+int32[] torrents
