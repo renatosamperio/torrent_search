@@ -10,3 +10,4 @@ string   date_uploaded
 string   size
 string   magnet
 YtsState state
+string[] files
