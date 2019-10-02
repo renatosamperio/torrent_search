@@ -390,6 +390,12 @@ class Downloader(object):
         except Exception as inst:
               ros_node.ParseException(inst)
 
+    def is_running(self):
+        return self.alarm.is_running
+    
+    def is_paused(self):
+        return self.alarm.is_paused
+
 class MetaDataDownloader(object):
     def __init__(self, **kwargs):
         
@@ -1145,12 +1151,6 @@ class TorrentDownloader(Downloader):
                 rospy.logdebug('Not pausing, current state is [%s]'%self.state)
         except Exception as inst:
               ros_node.ParseException(inst)
-
-    def is_running(self):
-        return self.alarm.is_running
-    
-    def is_paused(self):
-        return self.alarm.is_paused
 
 class DownloaderFSM:
     def __init__(self, **kwargs):
