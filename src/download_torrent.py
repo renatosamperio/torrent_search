@@ -649,6 +649,8 @@ class TorrentDownloader(Downloader):
                 while not all_are_finished:
                     rate.sleep()
                     for timer in timers:
+                        ## Wait until at least metadata of
+                        ##  one torrent has been download
                         all_are_finished = timer.is_finished()
                         if all_are_finished: 
                             label = 'not '
