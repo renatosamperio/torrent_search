@@ -847,7 +847,6 @@ class TorrentDownloader(Downloader):
                 self.update_db_state(hash, state)
 
             ## Starting timed download alarm
-            handles = self.ses.get_torrents()
             num_handles = len(handles)
             if num_handles>0:
                 self.alarm.start()
