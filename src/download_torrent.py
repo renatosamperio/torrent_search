@@ -349,11 +349,20 @@ class SlackPoster(object):
 class Downloader(object):
     def __init__(self, **kwargs):
         try:
-            self.ses                = None
+            self.ses                = lt.session()
             self.params             = None
             self.torrents_tracker   = {}
             
             ## Automatic start and stop
+            self.state_str = [
+                    'queued', 
+                    'checking', 
+                    'downloading metadata',
+                    'downloading', 
+                    'finished', 
+                    'seeding', 
+                    'allocating'
+            ]
             seconds_per_hour        = 3600
             self.download_time      = 0.5* seconds_per_hour #s
             self.download_pause     = 6.0* seconds_per_hour #s
@@ -390,6 +399,58 @@ class Downloader(object):
         except Exception as inst:
               ros_node.ParseException(inst)
 
+    def is_running(self):
+        return self.alarm.is_running
+    
+    def is_paused(self):
+        return self.alarm.is_paused
+
+    def get_state_str(self, state): 
+        try:
+            if state < len(self.state_str):
+                return self.state_str[state]
+            else:
+                rospy.loginfo('Unrecognised state (%s): %s'%(str(state), str(state)) )
+                return str(state).strip()
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
+    def is_downloading_torrent(self, hash):
+        try:
+            return hash in self.torrents_tracker.keys()
+        except Exception as inst:
+            ros_node.ParseException(inst)
+
+    def print_info(self, handle):
+        try:
+        
+            status          = handle.status()
+            handle_name     = handle.name()
+            print "===> handle_name:", handle_name
+            print "===> status.info_hash:", status.info_hash
+            print "===> status.progress:", status.progress
+            print "===> status.is_finished:", status.is_finished
+            print "===> status.is_seeding:", status.is_seeding
+            print ""
+            print "===> status.total_download:", status.total_download
+            print "===> status.total_payload_download:", status.total_payload_download
+            print "===> status.total_done:", status.total_done
+            print "===> status.total_wanted_done:", status.total_wanted_done
+            print "===> status.total_wanted:", status.total_wanted
+            print ""
+            print "===> status.progress:", status.progress
+            print "===> status.finished_time:", status.finished_time
+            print "===> status.active_time:", status.active_time
+            print "===> status.seeding_time:", status.seeding_time
+            print "===> status.progress_ppm:", status.progress_ppm
+            print ""
+            print "===> COND:",  status.is_seeding and status.is_finished
+            print "===> status.state:", self.get_state_str(status.state)
+            print "===> "*5
+    
+        except Exception as inst:
+            ros_node.ParseException(inst)
+
 class MetaDataDownloader(object):
     def __init__(self, **kwargs):
         
@@ -397,7 +458,6 @@ class MetaDataDownloader(object):
             self.torrent_info     = None
             self.index            = None
             self.downloader       = None
-            self.session          = None
             self.has_requested    = False
             self.id               = None
             self.torrents_tracker = {}
@@ -522,18 +582,7 @@ class TorrentDownloader(Downloader):
             
             super(TorrentDownloader, self).__init__(**kwargs)
 
-            self.state_str = [
-                    'queued', 
-                    'checking', 
-                    'downloading metadata',
-                    'downloading', 
-                    'finished', 
-                    'seeding', 
-                    'allocating'
-            ]
-            
             rospy.logdebug('Starting torrent session')
-            self.ses                = lt.session()
             self.chosen_torrents    = []
             self.handle             = None
             self.status             = None
@@ -576,16 +625,6 @@ class TorrentDownloader(Downloader):
             ##   params are called
             self.fsm_condition  = threading.Condition()
             
-        except Exception as inst:
-              ros_node.ParseException(inst)
-
-    def get_state_str(self, state): 
-        try:
-            if state < len(self.state_str):
-                return self.state_str[state]
-            else:
-                rospy.loginfo('Unrecognised state (%s): %s'%(str(state), str(state)) )
-                return str(state).strip()
         except Exception as inst:
               ros_node.ParseException(inst)
 
@@ -790,42 +829,6 @@ class TorrentDownloader(Downloader):
         except Exception as inst:
               ros_node.ParseException(inst)
 
-    def print_info(self, handle):
-        try:
-        
-            status          = handle.status()
-            handle_name     = handle.name()
-            print "===> handle_name:", handle_name
-            print "===> status.info_hash:", status.info_hash
-            print "===> status.progress:", status.progress
-            print "===> status.is_finished:", status.is_finished
-            print "===> status.is_seeding:", status.is_seeding
-            print ""
-            print "===> status.total_download:", status.total_download
-            print "===> status.total_payload_download:", status.total_payload_download
-            print "===> status.total_done:", status.total_done
-            print "===> status.total_wanted_done:", status.total_wanted_done
-            print "===> status.total_wanted:", status.total_wanted
-            print ""
-            print "===> status.progress:", status.progress
-            print "===> status.finished_time:", status.finished_time
-            print "===> status.active_time:", status.active_time
-            print "===> status.seeding_time:", status.seeding_time
-            print "===> status.progress_ppm:", status.progress_ppm
-            print ""
-            print "===> COND:",  status.is_seeding and status.is_finished
-            print "===> status.state:", self.get_state_str(status.state)
-            print "===> "*5
-    
-        except Exception as inst:
-            ros_node.ParseException(inst)
-
-    def is_downloading_torrent(self, hash):
-        try:
-            return hash in self.torrents_tracker.keys()
-        except Exception as inst:
-            ros_node.ParseException(inst)
-        
     def downloader_thread(self, event):
         ''' Run method '''
         try:
@@ -841,7 +844,6 @@ class TorrentDownloader(Downloader):
                 self.update_db_state(hash, state)
 
             ## Starting timed download alarm
-            handles = self.ses.get_torrents()
             num_handles = len(handles)
             if num_handles>0:
                 self.alarm.start()
