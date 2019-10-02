@@ -354,6 +354,15 @@ class Downloader(object):
             self.torrents_tracker   = {}
             
             ## Automatic start and stop
+            self.state_str = [
+                    'queued', 
+                    'checking', 
+                    'downloading metadata',
+                    'downloading', 
+                    'finished', 
+                    'seeding', 
+                    'allocating'
+            ]
             seconds_per_hour        = 3600
             self.download_time      = 0.5* seconds_per_hour #s
             self.download_pause     = 6.0* seconds_per_hour #s
@@ -395,6 +404,16 @@ class Downloader(object):
     
     def is_paused(self):
         return self.alarm.is_paused
+
+    def get_state_str(self, state): 
+        try:
+            if state < len(self.state_str):
+                return self.state_str[state]
+            else:
+                rospy.loginfo('Unrecognised state (%s): %s'%(str(state), str(state)) )
+                return str(state).strip()
+        except Exception as inst:
+              ros_node.ParseException(inst)
 
 class MetaDataDownloader(object):
     def __init__(self, **kwargs):
@@ -528,16 +547,6 @@ class TorrentDownloader(Downloader):
             
             super(TorrentDownloader, self).__init__(**kwargs)
 
-            self.state_str = [
-                    'queued', 
-                    'checking', 
-                    'downloading metadata',
-                    'downloading', 
-                    'finished', 
-                    'seeding', 
-                    'allocating'
-            ]
-            
             rospy.logdebug('Starting torrent session')
             self.ses                = lt.session()
             self.chosen_torrents    = []
@@ -582,16 +591,6 @@ class TorrentDownloader(Downloader):
             ##   params are called
             self.fsm_condition  = threading.Condition()
             
-        except Exception as inst:
-              ros_node.ParseException(inst)
-
-    def get_state_str(self, state): 
-        try:
-            if state < len(self.state_str):
-                return self.state_str[state]
-            else:
-                rospy.loginfo('Unrecognised state (%s): %s'%(str(state), str(state)) )
-                return str(state).strip()
         except Exception as inst:
               ros_node.ParseException(inst)
 
