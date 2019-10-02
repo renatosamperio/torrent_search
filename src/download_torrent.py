@@ -349,7 +349,7 @@ class SlackPoster(object):
 class Downloader(object):
     def __init__(self, **kwargs):
         try:
-            self.ses                = None
+            self.ses                = lt.session()
             self.params             = None
             self.torrents_tracker   = {}
             
@@ -422,7 +422,6 @@ class MetaDataDownloader(object):
             self.torrent_info     = None
             self.index            = None
             self.downloader       = None
-            self.session          = None
             self.has_requested    = False
             self.id               = None
             self.torrents_tracker = {}
@@ -548,7 +547,6 @@ class TorrentDownloader(Downloader):
             super(TorrentDownloader, self).__init__(**kwargs)
 
             rospy.logdebug('Starting torrent session')
-            self.ses                = lt.session()
             self.chosen_torrents    = []
             self.handle             = None
             self.status             = None
