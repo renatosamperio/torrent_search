@@ -24,6 +24,7 @@ add_message_files(
   YtsState.msg
   YtsTorrent.msg
   YtsHistory.msg
+  YtsDownloadState.msg
 )
   
 # Generate added messages and services with any dependencies listed here

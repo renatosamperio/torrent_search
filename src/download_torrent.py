@@ -34,6 +34,7 @@ from hs_utils.mongo_handler import MongoAccess
 from hs_utils import json_message_converter as rj
 from torrent_search.msg import State
 from torrent_search.msg import YtsTorrents
+from torrent_search.msg import YtsDownloadState
 from std_msgs.msg import Float64
 from hs_utils import slack_client
 
@@ -582,7 +583,18 @@ class TorrentDownloader(Downloader):
             
             super(TorrentDownloader, self).__init__(**kwargs)
 
+            self.state_str = [
+                    'queued', 
+                    'checking', 
+                    'downloading metadata',
+                    'downloading', 
+                    'finished', 
+                    'seeding', 
+                    'allocating'
+            ]
+            
             rospy.logdebug('Starting torrent session')
+            self.ses                = lt.session()
             self.chosen_torrents    = []
             self.handle             = None
             self.status             = None
@@ -592,6 +604,7 @@ class TorrentDownloader(Downloader):
             self.previous_state     = 'None'
             self.database           = None
             self.collection         = None
+            self.state_pub          = None
             
             ## Parsing arguments
             for key, value in kwargs.iteritems():
@@ -605,6 +618,8 @@ class TorrentDownloader(Downloader):
                     self.database = value
                 elif "collection" == key:
                     self.collection = value
+                elif "state_pub" == key:
+                    self.state_pub = value
 
             self.params = { 'save_path': self.save_path}
             
@@ -628,6 +643,24 @@ class TorrentDownloader(Downloader):
         except Exception as inst:
               ros_node.ParseException(inst)
 
+    def get_state_str(self, state): 
+        try:
+            if state < len(self.state_str):
+                return self.state_str[state]
+            else:
+                rospy.loginfo('Unrecognised state (%s): %s'%(str(state), str(state)) )
+                return str(state).strip()
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
+    def started(self): 
+        try:
+            print "=== STANDBY: started transition"
+            self.state_pub.publish(YtsDownloadState(state=YtsDownloadState.STANDBY))
+        except Exception as inst:
+            ros_node.ParseException(inst)
+            self.fail()
+     
     def set_up_configuration(self, torrent=None):
         try:
             if torrent is None:
@@ -638,7 +671,8 @@ class TorrentDownloader(Downloader):
             
             ## FSM transition status
             rospy.logdebug('---> Setting up configuration ['+self.previous_state+'] -> ['+self.state+']')
-            timers = []
+            timers    = []
+            state_msg = YtsDownloadState()
             
             ## Looking for selected torrents
             for id in range(len(torrent['torrent_items'])):
@@ -650,6 +684,9 @@ class TorrentDownloader(Downloader):
                     is_downlading    = self.is_downloading_torrent(torrent_data['hash'])
                     
                     if (selected_torrent and not is_downlading ):
+                        
+                        ## Collect selected torrent ID for state publishing
+                        state_msg.torrents.append(torrent_info['id'])
                         
                         ## Creating a metadata download thread
                         rospy.logdebug('Downloading metadata in a separate thread')
@@ -704,6 +741,11 @@ class TorrentDownloader(Downloader):
                 self.pause()
                 return
             
+            ## Inform to download torrents
+            state_msg.state  = YtsDownloadState.DOWNLOADING_TORRENT
+            self.state_pub.publish(state_msg)
+            rospy.logdebug('Published public state [%d]'%state_msg.state)
+            
             ## Moving to next state
             rospy.logdebug('Starting download')
             self.download()
@@ -756,6 +798,9 @@ class TorrentDownloader(Downloader):
               
     def pausing_download(self): 
         try:
+            print "=== PAUSED"
+            self.state_pub.publish(YtsDownloadState(state=YtsDownloadState.PAUSED))
+            
             if not self.is_Paused():
                 self.failed_pause()
             else:
@@ -958,6 +1003,12 @@ class TorrentDownloader(Downloader):
                             rospy.logdebug('Stopping downloading timer alarm')
                             self.alarm.finish_now()
                         
+                        ## Informing torrent has finished                        
+                        state_msg = YtsDownloadState()
+                        state_msg.state = YtsDownloadState.FINISHED_TORRENT
+                        finished_torrent = self.torrents_tracker[torrent_hash]['metadata'].torrent_info['id']
+                        state_msg.torrents.append(finished_torrent)
+                        self.state_pub.publish(state_msg)
                         
                         ## Removing torrent local info
                         rospy.logdebug('Removing local info for [%s]'%
@@ -1048,6 +1099,14 @@ class TorrentDownloader(Downloader):
                                 'history': [new_state]
                             }
                         }
+                        if save_path is not None:
+                            save_path = {
+                                'save_path':save_path
+                            }
+                            ## Adding torrent save path
+                            element['torrents'][i].update(save_path)
+                        
+                        ## Updating torrent state per hash
                         element['torrents'][i].update(state)
                         rospy.loginfo('  Created new DB state [%s] for [%s]'%
                                       (target_state, element['id']))
@@ -1212,6 +1271,7 @@ class DownloaderFSM:
                                    transitions=self.transitions, 
                                    initial='Start')
             
+            self.machine.on_enter_Start         ('started')
             self.machine.on_enter_Unlock        ('unlocking')
             self.machine.on_enter_Setup         ('set_up_configuration')
             self.machine.on_enter_Downloading   ('start_downloading')
@@ -1392,7 +1452,8 @@ class DownloadTorrent(ros_node.RosNode):
                 'database':      'yts',
                 'collection':    'torrents',
                 'download_time':  self.download_time,
-                'download_pause': self.download_pause
+                'download_pause': self.download_pause,
+                'state_pub':      self.mapped_pubs['~state']#.publish(msg)
             })
             self.downloader = DownloaderFSM(**self.args)
             
@@ -1426,6 +1487,10 @@ class DownloadTorrent(ros_node.RosNode):
         ''' Run method '''
         try:
             rospy.loginfo('Running FSM')
+            
+            print "=== STANDBY: Run"
+            self.Publish('~state', YtsDownloadState(state=YtsDownloadState.STANDBY) )
+            
             while not rospy.is_shutdown():
                 ## Wait for being notified that a message
                 ##    has arrived
@@ -1461,6 +1526,7 @@ class DownloadTorrent(ros_node.RosNode):
                     next_state = 'incorporate'
                 elif self.downloader.fsm.is_paused():
                     next_state = 'halted_add'
+                    #self.Publish('~state', YtsDownloadState(state=1) )
 
                 ## Going to next state with input data
                 args = {'info': msg}
@@ -1535,7 +1601,7 @@ if __name__ == '__main__':
         ('/yts_finder/found_torrents',  YtsTorrents)
     ]
     pub_topics     = [
-#         ('/event_locator/updated_events', WeeklyEvents)
+        ('~state',                      YtsDownloadState)
     ]
     system_params  = [
         '/download_torrent/download_time',

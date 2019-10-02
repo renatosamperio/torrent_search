@@ -68,6 +68,8 @@ class YtsRequests(object):
                     ##    torrent in DB
                     
                     ## Add a download state for each torrent
+                    if 'torrents' not in item.keys():
+                        rospy.logwarn('Incomplete torrent was not inserted:\n%s'%str(item))
                     for torrent in item['torrents']:
                         torrent.update({'state':{ 'status':'', 'history': []}})
                     
