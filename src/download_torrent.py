@@ -415,6 +415,12 @@ class Downloader(object):
         except Exception as inst:
               ros_node.ParseException(inst)
 
+    def is_downloading_torrent(self, hash):
+        try:
+            return hash in self.torrents_tracker.keys()
+        except Exception as inst:
+            ros_node.ParseException(inst)
+
 class MetaDataDownloader(object):
     def __init__(self, **kwargs):
         
@@ -823,12 +829,6 @@ class TorrentDownloader(Downloader):
         except Exception as inst:
             ros_node.ParseException(inst)
 
-    def is_downloading_torrent(self, hash):
-        try:
-            return hash in self.torrents_tracker.keys()
-        except Exception as inst:
-            ros_node.ParseException(inst)
-        
     def downloader_thread(self, event):
         ''' Run method '''
         try:
