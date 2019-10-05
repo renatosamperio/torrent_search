@@ -673,16 +673,6 @@ class TorrentDownloader(Downloader):
             
             super(TorrentDownloader, self).__init__(**kwargs)
 
-            self.state_str = [
-                    'queued', 
-                    'checking', 
-                    'downloading metadata',
-                    'downloading', 
-                    'finished', 
-                    'seeding', 
-                    'allocating'
-            ]
-            
             rospy.logdebug('Starting torrent session')
             self.ses                = lt.session()
             self.chosen_torrents    = []
@@ -732,25 +722,16 @@ class TorrentDownloader(Downloader):
             
         except Exception as inst:
               ros_node.ParseException(inst)
-
-    def get_state_str(self, state): 
+              
+    def started(self):
         try:
-            if state < len(self.state_str):
-                return self.state_str[state]
-            else:
-                rospy.loginfo('Unrecognised state (%s): %s'%(str(state), str(state)) )
-                return str(state).strip()
-        except Exception as inst:
-              ros_node.ParseException(inst)
-
-    def started(self): 
-        try:
-            print "=== STANDBY: started transition"
-            self.state_pub.publish(YtsDownloadState(state=YtsDownloadState.STANDBY))
+            ## Inform to download torrents
+            self.get_state(YDS.STANDBY)
+            
         except Exception as inst:
             ros_node.ParseException(inst)
             self.fail()
-     
+
     def set_up_configuration(self, torrent=None):
         try:
             if torrent is None:
@@ -762,7 +743,6 @@ class TorrentDownloader(Downloader):
             ## FSM transition status
             rospy.logdebug('---> Setting up configuration ['+self.previous_state+'] -> ['+self.state+']')
             timers    = []
-            state_msg = YtsDownloadState()
             
             ## Looking for selected torrents
             for id in range(len(torrent['torrent_items'])):
@@ -774,9 +754,6 @@ class TorrentDownloader(Downloader):
                     is_downlading    = self.is_downloading_torrent(torrent_data['hash'])
                     
                     if (selected_torrent and not is_downlading ):
-                        
-                        ## Collect selected torrent ID for state publishing
-                        state_msg.torrents.append(torrent_info['id'])
                         
                         ## Creating a metadata download thread
                         rospy.logdebug('Downloading metadata in a separate thread')
@@ -1004,11 +981,6 @@ class TorrentDownloader(Downloader):
                     handle_name     = handle.name()
                     
                     ## Collecting torrent data
-                    progress        = status.progress * 100.0
-                    download_rate   = status.download_rate / 1000
-                    upload_rate     = status.upload_rate / 1000
-                    num_peers       = status.num_peers
-                    num_seeds       = status.num_seeds
                     torrent_hash    = str(status.info_hash).upper()
                     state           = self.get_state_str(status.state)
                     
@@ -1092,13 +1064,6 @@ class TorrentDownloader(Downloader):
                         if num_handles<1:
                             rospy.logdebug('Stopping downloading timer alarm')
                             self.alarm.finish_now()
-                        
-                        ## Informing torrent has finished                        
-                        state_msg = YtsDownloadState()
-                        state_msg.state = YtsDownloadState.FINISHED_TORRENT
-                        finished_torrent = self.torrents_tracker[torrent_hash]['metadata'].torrent_info['id']
-                        state_msg.torrents.append(finished_torrent)
-                        self.state_pub.publish(state_msg)
                         
                         ## Removing torrent local info
                         rospy.logdebug('Removing local info for [%s]'%
