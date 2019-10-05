@@ -25,3 +25,4 @@ string       date_uploaded
 int64        runtime
 string       yt_trailer_code
 string[]     genres
+string[]     files
