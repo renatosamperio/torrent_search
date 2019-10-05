@@ -34,7 +34,8 @@ from hs_utils.mongo_handler import MongoAccess
 from hs_utils import json_message_converter as rj
 from torrent_search.msg import State
 from torrent_search.msg import YtsTorrents
-from torrent_search.msg import YtsDownloadState
+from torrent_search.msg import YtsDownloadState as YDS
+from torrent_search.msg import YtsProgress
 from std_msgs.msg import Float64
 from hs_utils import slack_client
 
@@ -1601,7 +1602,7 @@ if __name__ == '__main__':
         ('/yts_finder/found_torrents',  YtsTorrents)
     ]
     pub_topics     = [
-        ('~state',                      YtsDownloadState)
+        ('~state',                      YDS)
     ]
     system_params  = [
         '/download_torrent/download_time',
