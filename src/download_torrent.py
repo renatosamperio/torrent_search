@@ -1012,7 +1012,7 @@ class TorrentDownloader(Downloader):
                                           (time_last_update, tracker.torrents_tracker['name']))
                         continue
 
-                    if 'files' not in self.torrents_tracker.keys():
+                    if 'files' not in self.torrents_tracker[torrent_hash].keys():
                         torinfo = handle.get_torrent_info()
                         files = torinfo.files()
                         torrent_files = []
