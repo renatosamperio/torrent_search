@@ -809,9 +809,7 @@ class TorrentDownloader(Downloader):
                 return
             
             ## Inform to download torrents
-            state_msg.state  = YtsDownloadState.DOWNLOADING_TORRENT
-            self.state_pub.publish(state_msg)
-            rospy.logdebug('Published public state [%d]'%state_msg.state)
+            self.get_state(YDS.CONFIGURING)
             
             ## Moving to next state
             rospy.logdebug('Starting download')
@@ -865,8 +863,8 @@ class TorrentDownloader(Downloader):
               
     def pausing_download(self): 
         try:
-            print "=== PAUSED"
-            self.state_pub.publish(YtsDownloadState(state=YtsDownloadState.PAUSED))
+            ## Publishing state
+            self.get_state(YDS.PAUSED)
             
             if not self.is_Paused():
                 self.failed_pause()
@@ -1032,22 +1030,17 @@ class TorrentDownloader(Downloader):
                     previous_state  = self.previous_state
                     current_state   = self.state
                     
-                    rospy.loginfo('(%4.2f) %3.2f%% [down: %.1f kb/s, up: %.1f kB/s, peers: %d, seeds: %d] %s: [%s] '% (
-                        self.alarm.elapsed_time,
-                        progress, 
-                        download_rate, 
-                        upload_rate, 
-                        num_peers, 
-                        num_seeds,
-                        state,
-                        handle_name,
-                    ))
+                    ## Sharing current state
+                    self.get_state(YDS.DOWNLOADING)
                     
                     ## Remove torrent if it is already finished, 
                     ##    otherwise keep pulling for state
                     if status.is_seeding and status.is_finished:
                         rospy.loginfo('[%s] has just finished'%handle_name)
                         
+                        ## Informing torrent has finished before removing state
+                        self.get_state(YDS.FINISHED_TORRENT)
+
                         ## Removing handle from session
                         self.ses.remove_torrent(handle)
                         rospy.loginfo('Removing handle [%s] from session'%handle_name)
@@ -1544,11 +1537,11 @@ class DownloadTorrent(ros_node.RosNode):
     def Run(self, event):
         ''' Run method '''
         try:
+
+            ## Starting FSM state
             rospy.loginfo('Running FSM')
-            
-            print "=== STANDBY: Run"
-            self.Publish('~state', YtsDownloadState(state=YtsDownloadState.STANDBY) )
-            
+            self.downloader.get_state(YDS.STANDBY)
+                        
             while not rospy.is_shutdown():
                 ## Wait for being notified that a message
                 ##    has arrived
@@ -1584,7 +1577,9 @@ class DownloadTorrent(ros_node.RosNode):
                     next_state = 'incorporate'
                 elif self.downloader.fsm.is_paused():
                     next_state = 'halted_add'
-                    #self.Publish('~state', YtsDownloadState(state=1) )
+                    
+                    ## Publishing FSM state
+                    self.downloader.get_state(YDS.PAUSED)
 
                 ## Going to next state with input data
                 args = {'info': msg}
