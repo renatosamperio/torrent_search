@@ -1,0 +1,13 @@
+string   handle_name
+float32  progress
+float32  download_rate
+float32  upload_rate
+int32    num_peers
+int32    num_seeds
+string   torrent_hash
+string   state
+string   save_path
+string[] files
+bool     is_valid
+bool     is_seeding
+bool     is_finished
