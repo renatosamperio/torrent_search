@@ -365,6 +365,7 @@ class Downloader(object):
                     'seeding', 
                     'allocating'
             ]
+            self.formats            = ["mp4","mp4v","mpg4","mpeg","mpg","mpe","m1v","m2v","webm","avi","m4v","mkv"]   
             seconds_per_hour        = 3600
             self.download_time      = 0.5* seconds_per_hour #s
             self.download_pause     = 6.0* seconds_per_hour #s
@@ -452,6 +453,94 @@ class Downloader(object):
     
         except Exception as inst:
             ros_node.ParseException(inst)
+
+    def get_state(self, fsm_state):
+        def is_movie(file_name):
+            extension_found = [extension for extension in self.formats if extension in file_name]
+            has_extension = len(extension_found)>0
+            label = str(extension_found)+' was found' if has_extension else 'not found' 
+            #rospy.logdebug('  Extension %s in with state %s'%(label, get_fsm_state(fsm_state)))
+            return has_extension
+                           
+        def get_fsm_state(state):
+            label = 'UNKNOWN'
+            if state == YDS.STANDBY:
+                label =  'STANDBY'
+            elif state == YDS.PAUSED:
+                label =  'PAUSED'
+            elif state == YDS.CONFIGURING:
+                label =  'CONFIGURING'
+            elif state == YDS.DOWNLOADING:
+                label =  'DOWNLOADING'
+            elif state == YDS.FINISHED_TORRENT:
+                label =  'FINISHED_TORRENT'
+            return label
+        '''
+        Publishes torrent states
+        '''
+        try:
+            st                  = YDS()
+            handles             = self.ses.get_torrents()
+            st.num_handles      = len(handles)
+            st.fsm_state        = fsm_state
+            for i in range(st.num_handles):
+                s               = YtsProgress()
+                handle          = handles[i]
+                status          = handle.status()
+                
+                ## Collecting torrent data
+                s.handle_name   = handle.name()
+                s.progress      = status.progress * 100.0
+                s.download_rate = status.download_rate / 1000
+                s.upload_rate   = status.upload_rate / 1000
+                s.num_peers     = status.num_peers
+                s.num_seeds     = status.num_seeds
+                s.torrent_hash  = str(status.info_hash).upper()
+                s.state         = self.get_state_str(status.state)
+                s.save_path     = handle.save_path()
+                s.is_finished   = status.is_seeding
+                s.is_seeding    = status.num_seeds
+                s.is_valid      = handle.is_valid()
+                
+                rospy.loginfo('(%4.2f) %3.2f%% [down: %.1f kb/s, up: %.1f kB/s, peers: %d, seeds: %d] %s: [%s] '% (
+                    self.alarm.elapsed_time,
+                    s.progress, 
+                    s.download_rate, 
+                    s.upload_rate, 
+                    s.num_peers, 
+                    s.num_seeds,
+                    s.state,
+                    s.handle_name,
+                ))
+                ## TESTING!
+#                 print "==== trackers:"
+#                 trackers = handle.trackers()
+#                 for t in trackers:
+#                     print "====   ", t#t.url, "-", t.message, "-", t.source
+                    
+        
+                ## Torrent info is not accessible while 
+                ##    torrent is being configured and
+                ##    or downloading metadata
+                try:
+                    torinfo     = handle.get_torrent_info()
+                    files       = torinfo.files()
+                    total_size  = torinfo.total_size()
+                    
+                    ## Looking for files
+                    for file in files:
+                        if is_movie(file.path):
+                            s.files.append(file.path)
+                except RuntimeError:
+                    rospy.logwarn('Could not access to files to [%s]'%s.handle_name)
+                
+                st.torrents.append(s)
+            st.header.stamp      = rospy.Time.now()
+            
+            #rospy.logdebug('FMS state: '+ get_fsm_state(fsm_state))
+            self.state_pub.publish(st)
+        except Exception as inst:
+              ros_node.ParseException(inst)
 
 class MetaDataDownloader(object):
     def __init__(self, **kwargs):
@@ -1412,6 +1501,9 @@ class DownloaderFSM:
         preivous = self.fsm.alarm.download_time
         self.fsm.alarm.download_time = value
         rospy.logdebug('  Setting download_time from [%f] to [%f]'%(preivous, value))
+
+    def get_state(self, fsm_state):
+        self.fsm.get_state(fsm_state)
 
 class DownloadTorrent(ros_node.RosNode):
     def __init__(self, **kwargs):
