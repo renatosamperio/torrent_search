@@ -383,13 +383,15 @@ class Downloader(object):
                 elif "download_pause" == key:
                     self.download_pause = value
                     rospy.logdebug('  Setting download_pause to [%f]'%self.download_pause)
-                    
+            
+            ## Updated client callbacks
             args = {
-                'download_time':            self.download_time,
-                'download_pause':           self.download_pause,
                 'client_stop_downloading':  self.client_stop_downloading,
                 'client_stop_pausing':      self.client_stop_pausing
             }
+            kwargs.update(args)
+            
+            ## Implementing helping classes
             self.alarm = Alarm(**args)
             
         except Exception as inst:
@@ -1469,6 +1471,8 @@ class DownloadTorrent(ros_node.RosNode):
             self.downloader     = None
             self.download_time  = None
             self.download_pause = None
+            self.save_path      = None
+            self.catalog        = None
             self.args           = kwargs
             
             ## This variable has to be started before ROS
@@ -1491,10 +1495,15 @@ class DownloadTorrent(ros_node.RosNode):
     def Init(self):
         try:
             
-            self.download_time = self.GetParam('/download_torrent/download_time')
+            self.download_time  = self.GetParam('/download_torrent/download_time')
             rospy.logdebug('+ Got download_time of [%s]'%str(self.download_time))
             self.download_pause = self.GetParam('/download_torrent/download_pause')
             rospy.logdebug('+ Got download_pause of [%s]'%str(self.download_pause))
+
+            self.save_path      = self.GetParam('/download_torrent/save_path')
+            rospy.logdebug('+ Over writing save_path with [%s]'%str(self.save_path))
+            self.catalog        = self.GetParam('/download_torrent/catalog')
+            rospy.logdebug('+ Got catalog of [%s]'%str(self.catalog))
             
             ## Local FSM
             self.args.update({
@@ -1502,7 +1511,9 @@ class DownloadTorrent(ros_node.RosNode):
                 'collection':    'torrents',
                 'download_time':  self.download_time,
                 'download_pause': self.download_pause,
-                'state_pub':      self.mapped_pubs['~state']#.publish(msg)
+                'state_pub':      self.mapped_pubs['~state'],
+                'catalog':        self.catalog,
+                'save_path':      self.save_path
             })
             self.downloader = DownloaderFSM(**self.args)
             
@@ -1656,7 +1667,9 @@ if __name__ == '__main__':
     ]
     system_params  = [
         '/download_torrent/download_time',
-        '/download_torrent/download_pause'
+        '/download_torrent/download_pause',
+        '/download_torrent/save_path',
+        '/download_torrent/catalog'
     ]
     
     ## Defining arguments
