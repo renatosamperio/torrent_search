@@ -44,6 +44,12 @@ import libtorrent as lt
 from __builtin__ import True
 from future.backports.test.pystone import TRUE
 
+def is_movie(file_name):
+    formats         = ["mp4","mp4v","mpg4","mpeg","mpg","mpe","m1v","m2v","webm","avi","m4v","mkv"]   
+    extension_found = [extension for extension in formats if extension in file_name]
+    has_extension   = len(extension_found)>0
+    return has_extension
+                   
 def set_history(operation):
     try:
         return {'operation': operation, 'last_update': time.time()}
@@ -364,8 +370,7 @@ class Downloader(object):
                     'finished', 
                     'seeding', 
                     'allocating'
-            ]
-            self.formats            = ["mp4","mp4v","mpg4","mpeg","mpg","mpe","m1v","m2v","webm","avi","m4v","mkv"]   
+            ] 
             seconds_per_hour        = 3600
             self.download_time      = 0.5* seconds_per_hour #s
             self.download_pause     = 6.0* seconds_per_hour #s
@@ -395,7 +400,7 @@ class Downloader(object):
             rospy.loginfo('client_stop_pausing: nothing to do')
         except Exception as inst:
               ros_node.ParseException(inst)
-              
+
     def client_stop_downloading(self):
         try:
             rospy.loginfo('client_stop_downloading, nothing to do')
@@ -455,13 +460,9 @@ class Downloader(object):
             ros_node.ParseException(inst)
 
     def get_state(self, fsm_state):
-        def is_movie(file_name):
-            extension_found = [extension for extension in self.formats if extension in file_name]
-            has_extension = len(extension_found)>0
-            label = str(extension_found)+' was found' if has_extension else 'not found' 
-            #rospy.logdebug('  Extension %s in with state %s'%(label, get_fsm_state(fsm_state)))
-            return has_extension
-                           
+        '''
+        Publishes torrent states
+        '''
         def get_fsm_state(state):
             label = 'UNKNOWN'
             if state == YDS.STANDBY:
@@ -475,9 +476,7 @@ class Downloader(object):
             elif state == YDS.FINISHED_TORRENT:
                 label =  'FINISHED_TORRENT'
             return label
-        '''
-        Publishes torrent states
-        '''
+
         try:
             st                  = YDS()
             handles             = self.ses.get_torrents()
@@ -517,8 +516,7 @@ class Downloader(object):
 #                 trackers = handle.trackers()
 #                 for t in trackers:
 #                     print "====   ", t#t.url, "-", t.message, "-", t.source
-                    
-        
+
                 ## Torrent info is not accessible while 
                 ##    torrent is being configured and
                 ##    or downloading metadata
@@ -777,7 +775,7 @@ class TorrentDownloader(Downloader):
                                     'metadata':  downloader
                                 }
                             })
-
+                        
                         time.sleep(0.25)
             downloading_torrents=len(timers)
             rospy.loginfo('Metadata downloading for [%d] torrents'%downloading_torrents)
@@ -1478,7 +1476,7 @@ class DownloadTorrent(ros_node.RosNode):
             self.lock       = threading.Lock()
             self.condition  = threading.Condition()
             self.queue      = Queue.Queue()
-            
+
             ## Shutdown signal
             rospy.on_shutdown(self.ShutdownCallback)
             
