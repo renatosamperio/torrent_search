@@ -71,7 +71,7 @@ class MovieNode:
 
     def make(self, id, session):
         try:
-            rospy.logdebug('  NODE: Looking for id [%s] and hash [%s]'%(id, hash))
+            rospy.logdebug('  NODE: Looking for id [%s]'%(id))
             
             handles          = session.get_torrents()
             num_handles      = len(handles)
@@ -96,8 +96,7 @@ class MovieNode:
                             ## Looking for movie in a path
                             movie_path = self.save_path+'/'+file.path
                             if not os.path.exists(movie_path):
-                                rospy.logwarn("  NODE: File [%s] does not exists, couldn't create movie file system for [%s]"%( movie_path, id))
-                                continue
+                                rospy.logdebug("  NODE: File [%s] does not exists, couldn't create movie file system for [%s]"%( movie_path, id))
 
                             ## Create movie directory from ID
                             if not os.path.islink(hash_path):
@@ -450,7 +449,7 @@ class Downloader(object):
             kwargs.update(args)
             
             ## Implementing helping classes
-            self.alarm = Alarm(**args)
+            self.alarm = Alarm(**kwargs)
             self.node_handler = MovieNode(**kwargs)
             
         except Exception as inst:
@@ -591,7 +590,7 @@ class Downloader(object):
                         if is_movie(file.path):
                             s.files.append(file.path)
                 except RuntimeError:
-                    rospy.logwarn('Could not access to files to [%s]'%s.handle_name)
+                    rospy.logdebug('Could not access to files to [%s]'%s.handle_name)
                 
                 st.torrents.append(s)
             st.header.stamp      = rospy.Time.now()
@@ -1584,7 +1583,7 @@ class DownloadTorrent(ros_node.RosNode):
             })
             self.downloader = DownloaderFSM(**self.args)
             
-            ## Executioning thread
+            ## Running thread
             rospy.Timer(rospy.Duration(0.5), self.Run, oneshot=True)
         except Exception as inst:
               ros_node.ParseException(inst)
