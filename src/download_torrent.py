@@ -56,6 +56,64 @@ def set_history(operation):
     except Exception as inst:
         ros_node.ParseException(inst)
 
+class MovieNode:
+    def __init__(self, **kwargs):
+        self.save_path = None
+        self.catalog   = None
+        ## Parsing arguments
+        for key, value in kwargs.iteritems():
+            if "save_path" == key:
+                self.save_path = value
+                rospy.logdebug('  NODE: Setting movies path [%s]'%self.save_path)
+            elif "catalog" == key:
+                self.catalog = value
+                rospy.logdebug('  NODE: Setting catalog path [%s]'%self.catalog)
+
+    def make(self, id, session):
+        try:
+            rospy.logdebug('  NODE: Looking for id [%s] and hash [%s]'%(id, hash))
+            
+            handles          = session.get_torrents()
+            num_handles      = len(handles)
+            for i in range(num_handles):
+                handle       = handles[i]
+                status       = handle.status()
+                torrent_hash = str(status.info_hash).upper()
+                
+                ## Use a symlink for torrent hash
+                hash_path    = self.catalog+'/'+torrent_hash
+                
+                ## Torrent info is not accessible while 
+                ##    torrent is being configured and
+                ##    or downloading metadata
+                try:
+                    torinfo  = handle.get_torrent_info()
+                    files    = torinfo.files()
+                    
+                    ## Looking for files
+                    for file in files:
+                        if is_movie(file.path):
+                            ## Looking for movie in a path
+                            movie_path = self.save_path+'/'+file.path
+                            if not os.path.exists(movie_path):
+                                rospy.logwarn("  NODE: File [%s] does not exists, couldn't create movie file system for [%s]"%( handle_name, id))
+                                continue
+
+                            ## Create movie directory from ID
+                            if not os.path.islink(hash_path):
+                                os.symlink(movie_path, hash_path)
+                                rospy.loginfo("  NODE: Created symlink for [%s]"%hash_path)
+                            else:
+                                rospy.logdebug('  NODE: Symlink [%s] already exists'%hash_path)
+
+                            ## TODO: We are only considering one movie file per hash per torrent!
+                            break
+                except RuntimeError:
+                    rospy.logwarn('  NODE: Could not access to files to [%s]'%s.handle_name)
+                
+        except Exception as inst:
+              ros_node.ParseException(inst)
+
 class Alarm:
     def __init__(self, **kwargs):
         try:
@@ -393,6 +451,7 @@ class Downloader(object):
             
             ## Implementing helping classes
             self.alarm = Alarm(**args)
+            self.node_handler = MovieNode(**kwargs)
             
         except Exception as inst:
               ros_node.ParseException(inst)
@@ -810,6 +869,12 @@ class TorrentDownloader(Downloader):
             
             ## Inform to download torrents
             self.get_state(YDS.CONFIGURING)
+            
+            ## Creating online movie file system, at this
+            ##    point we should be sure a file path exists
+            ##    in the session handler
+            rospy.logdebug('Creating online movie file system')
+            self.node_handler.make(torrent_info['id'], self.ses)
             
             ## Moving to next state
             rospy.logdebug('Starting download')
