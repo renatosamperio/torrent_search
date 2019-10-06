@@ -7,7 +7,12 @@ source $HS_HOME/src/hs_utils/setup/hs_bash_logs.bash
 # Sourcing ROS environment
 export ROS_LOG_DIR=/opt/home_services/data/logs
 source $HS_HOME/devel/setup.bash
+
+info "Loading API keys"
 source $HS_HOME/src/torrent_search/setup/hs_api_keys.bash
+
+info "Loading parameters"
+rosparam load $HS_HOME/src/torrent_search/config/setup_base.yaml
 
 # Starting band search
 info "Starting yts finder"
