@@ -96,7 +96,7 @@ class MovieNode:
                             ## Looking for movie in a path
                             movie_path = self.save_path+'/'+file.path
                             if not os.path.exists(movie_path):
-                                rospy.logwarn("  NODE: File [%s] does not exists, couldn't create movie file system for [%s]"%( handle_name, id))
+                                rospy.logwarn("  NODE: File [%s] does not exists, couldn't create movie file system for [%s]"%( movie_path, id))
                                 continue
 
                             ## Create movie directory from ID
@@ -1212,12 +1212,14 @@ class TorrentDownloader(Downloader):
                                 'history': [new_state]
                             }
                         }
-                        if save_path is not None:
-                            save_path = {
-                                'save_path':save_path
-                            }
-                            ## Adding torrent save path
-                            element['torrents'][i].update(save_path)
+                        
+#                         ## TODO: Adde location to DB
+#                         if save_path is not None:
+#                             save_path = {
+#                                 'save_path':save_path
+#                             }
+#                             ## Adding torrent save path
+#                             element['torrents'][i].update(save_path)
                         
                         ## Updating torrent state per hash
                         element['torrents'][i].update(state)
