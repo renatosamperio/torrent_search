@@ -78,6 +78,7 @@ class MovieNode:
             for i in range(num_handles):
                 handle       = handles[i]
                 status       = handle.status()
+                handle_name  = handle.name()
                 torrent_hash = str(status.info_hash).upper()
                 
                 ## Use a symlink for torrent hash
@@ -108,7 +109,7 @@ class MovieNode:
                             ## TODO: We are only considering one movie file per hash per torrent!
                             break
                 except RuntimeError:
-                    rospy.logwarn('  NODE: Could not access to files to [%s]'%s.handle_name)
+                    rospy.logwarn('  NODE: Could not access to files to [%s]'%handle_name)
                 
         except Exception as inst:
               ros_node.ParseException(inst)
