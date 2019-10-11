@@ -692,11 +692,11 @@ class MetaDataDownloader(object):
             hash = torrent_data['hash']
             
             torrent_name = self.torrent_info['title_long']+'-'+torrent_data['quality']+'-'+torrent_data['type']
-            rospy.logdebug('  [%d] Looking for torrent metadata for [%s]'%(self.id, torrent_name))
+            rospy.logdebug('  [%d.%d] Looking for torrent metadata for [%s]'%(self.id, self.index, torrent_name))
             
             ## Setting up local state
             if hash not in self.downloader.torrents_tracker:
-                rospy.logdebug('  [%d] Added tracking locally for %s'%(self.id, hash))
+                rospy.logdebug('  [%d.%d] Added tracking locally for %s'%(self.id, self.index, hash))
                 self.torrents_tracker.update({
                         'hash':             hash,
                         'state':            'search metadata',
@@ -710,7 +710,7 @@ class MetaDataDownloader(object):
                      
                 })
             else:
-                rospy.loginfo('  [%d] Tracker  [%s] already in local state'%(self.id, torrent_name))
+                rospy.loginfo('  [%d.%d] Tracker  [%s] already in local state'%(self.id, self.index, torrent_name))
                             
             timer = rospy.Timer(rospy.Duration(0.025), self.download_torrent_info, oneshot=True )
             return timer
@@ -1164,12 +1164,12 @@ class TorrentDownloader(Downloader):
         def has_state_in_history(state, history):
             try:
                 for item in history:
-                    if item['operation'] == state:
+                    if item['operation'] == state and state != 'finished':
                         rospy.logdebug('    State found [%s]'%str(item['operation']))
                         return False
                     rospy.logdebug('    State ignored [%s]'%str(item['operation']))
                 
-                rospy.logdebug('    State [%s] not found'%state)
+                rospy.logdebug('    State [%s] not found or not it should be updated'%state)
                 return True
             except Exception as inst:
                 ros_node.ParseException(inst)
@@ -1475,7 +1475,7 @@ class DownloaderFSM:
                     continue
                 
                 ## Looking into best match to download
-                rospy.logdebug('Looking torrents of [%s]'%item['title_long'])
+                rospy.logdebug('Matching torrents of [%s]'%item['title_long'])
                 max_seeds       = -1
                 chosen_index    = -1
                 for j in  range(len(item['torrents'])):
@@ -1490,7 +1490,7 @@ class DownloaderFSM:
                         ### torrent_info[i]['id']       = item.id
                         ### torrent_info[i]['title']    = item.title_long
                         
-                        rospy.logdebug('Looking for [%s] for %s-%s of %s with %d/%d'%
+                        rospy.logdebug('  Looking for [%s] for %s-%s of %s with %d/%d'%
                                       (item['title_long'], torrent['type'], 
                                        torrent['quality'], torrent['size'],
                                        torrent['seeds'], torrent['peers']))
