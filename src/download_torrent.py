@@ -1495,18 +1495,18 @@ class DownloaderFSM:
                                        torrent['quality'], torrent['size'],
                                        torrent['seeds'], torrent['peers']))
                 
-                ## Set selected torrent based in highest amount of seeds
-                operation = 'selected'
-                item['torrents'][chosen_index]['state']['status'] = operation
-                item['torrents'][chosen_index]['state']['history'].append(set_history(operation))
-                selected = item['torrents'][chosen_index]
-                rospy.loginfo('Choosing [%s] for %s-%s of %s with %d/%d'%
-                              (item['title_long'], selected['type'], 
-                               selected['quality'], selected['size'],
-                               selected['seeds'], selected['peers']))
-                
-                ## Should we update a selected state in this scope?
-                self.fsm.update_db_state(selected['hash'], operation)
+                    ## Set selected torrent based in highest amount of seeds
+                    operation = 'selected'
+                    item['torrents'][chosen_index]['state']['status'] = operation
+                    item['torrents'][chosen_index]['state']['history'].append(set_history(operation))
+                    selected = item['torrents'][chosen_index]
+                    rospy.loginfo('Choosing [%s] for %s-%s of %s with %d/%d'%
+                                  (item['title_long'], selected['type'], 
+                                   selected['quality'], selected['size'],
+                                   selected['seeds'], selected['peers']))
+                    
+                    ## Should we update a selected state in this scope?
+                    self.fsm.update_db_state(selected['hash'], operation)
                 
                 ## TODO: Make rules to download
                 ##        - Quality
