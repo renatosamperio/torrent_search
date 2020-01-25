@@ -1,5 +1,5 @@
 download_torrent:
-  save_path: /opt/data/movies
+  save_path: /opt/data/yts
   catalog: /opt/data/catalog
   download_time: 1800.0
   download_pause: 21600
