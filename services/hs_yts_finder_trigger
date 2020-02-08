@@ -9,6 +9,16 @@ export ROS_LOG_DIR=/opt/home_services/data/logs
 source $HS_HOME/devel/setup.bash
 
 ## Check if argument was provided
+export YESTERDAY=$(date -d "yesterday 00:00" '+%Y-%m-%d 00:00:0Z')
+
+
+# Starting band search
+info "Triggering YTS crawler"
+rostopic pub /yts_finder/trigger_download torrent_search/TriggerDownload "header: auto
+date_uploaded: $YESTERDAY
+search_type: 102" -1;
+
+exit 0
 export SEED_VALUE=$1
 if [ $# -eq 0 ]
   then
@@ -16,8 +26,13 @@ if [ $# -eq 0 ]
     SEED_VALUE=1900
 fi
 
-# Starting band search
-info "Triggering YTS crawler"
+
+if [ $# -eq 0 ]
+  then
+    echo "No arguments supplied"
+    SEED_VALUE=1900
+fi
+
 rostopic pub /yts_finder/trigger_download torrent_search/TriggerDownload "header: auto
 seeds: $SEED_VALUE
 search_type: 102" -1;
