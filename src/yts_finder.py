@@ -359,22 +359,42 @@ class YtsFinder(ros_node.RosNode):
                         ## Setting search query
                         msg = self.client.search_not_finished_torrents(options)
                         
-                    elif msg.search_type > TriggerDownload.SEARCH_BY_SEEDS_NOT_DOWNLOADED:
+                    elif msg.search_type > TriggerDownload.SEARCH_BY_SEEDS_NOT_DOWNLOADED and \
+                         msg.search_type < TriggerDownload.SEARCH_FILTERED:
                         
-                            ## Looking for torrents by ID
-                            if msg.search_type ==  TriggerDownload.SEARCH_BY_ID:
-                                options.update({'torrent_id': msg.torrent_id})\
+                        ## Looking for torrents by ID
+                        if msg.search_type ==  TriggerDownload.SEARCH_BY_ID:
+                            options.update({'torrent_id': msg.torrent_id})
+                        
+                        ## Looking for torrents by IMDB code
+                        elif msg.search_type ==  TriggerDownload.SEARCH_BY_HASH:
+                            options.update({'hash': msg.hash})
+                        
+                        ## Looking for torrents by IMDB code
+                        elif msg.search_type ==  TriggerDownload.SEARCH_BY_IMDB_CODE:
+                            options.update({'imdb': msg.imdb})
                             
-                            ## Looking for torrents by IMDB code
-                            elif msg.search_type ==  TriggerDownload.SEARCH_BY_HASH:
-                                options.update({'hash': msg.hash})
-                            
-                            ## Looking for torrents by IMDB code
-                            elif msg.search_type ==  TriggerDownload.SEARCH_BY_IMDB_CODE:
-                                options.update({'imdb': msg.imdb})
-                                
-                            ## Setting search query
-                            msg = self.client.search_one_torrent(options)
+                        ## Setting search query
+                        msg = self.client.search_one_torrent(options)
+                    elif msg.search_type > TriggerDownload.SEARCH_FILTERED:
+                        
+                        ## Looking for torrents by ID that were not downloaded
+                        if msg.search_type ==  TriggerDownload.SEARCH_FILTERED_NOT_DOWNLOADED_BY_SEEDS:
+                            options.update({'seeds': msg.seeds})
+                            rospy.loginfo('Setting up only not downloaded torrents by seeds number')
+                        
+                        ## Looking for torrents by IMDB code
+                        elif msg.search_type ==  TriggerDownload.SEARCH_FILTERED_NOT_DOWNLOADED_BY_DATE:
+                            if not msg.date_uploaded:
+                                date_uploaded = datetime.datetime.now().replace(microsecond=0).replace(second=0).replace(minute=0).replace(hour=0).isoformat()
+                            else:
+                                date_uploaded = msg.date_uploaded
+                            options.update({'date_uploaded': date_uploaded})
+                            rospy.loginfo('Setting up only not downloaded torrents by date uploaded')
+    
+                        ## Setting search query
+                        msg = self.client.search_filtered(options)
+                    
                     rospy.logdebug('Publishing parsed items')
                     self.Publish('~found_torrents', msg)
 
