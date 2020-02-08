@@ -22,6 +22,7 @@ import time
 import json
 import Queue
 import copy
+import pymongo
 
 from optparse import OptionParser, OptionGroup
 from pprint import pprint
@@ -60,6 +61,43 @@ class YtsRecords(object):
                               (self.database, self.collection))
         except Exception as inst:
               ros_node.ParseException(inst)
+
+    def search_filtered(self, options):
+        try:
+            configured_options = options.keys()
+            query = {}
+            posts = None
+
+            ## Search DB with uppers uploaded date
+            if 'seeds' in configured_options:
+                rospy.loginfo('Search not download items DB with given uploaded date')
+                query = { '$and': [ {'torrents.seeds': { '$gte': options['seeds'] }},{ "torrents.state.status": { '$ne': "finished" }  } ] };
+                sort_condition = None
+
+            ## Search DB with given title
+            elif 'date_uploaded' in configured_options:
+                rospy.loginfo('Search not download items DB with given seeds')
+                query = {'date_uploaded': { '$gte': options['date_uploaded'] }}
+
+                sort_condition = [
+                    ("year", pymongo.DESCENDING),
+                    ("rating", pymongo.DESCENDING), 
+                    ("date_uploaded", pymongo.ASCENDING)
+                ]
+            ## Execute query
+            posts     = self.db_handler.Find(query, sort_condition=sort_condition)
+            
+            ## Sorting out results
+            if 'seeds' in configured_options:
+                posts.sort("torrents.seeds", pymongo.ASCENDING)
+
+            rospy.loginfo("Found %d items, converting to ROS message"%posts.count() )
+            ros_msg   = self.db_to_ros(posts)
+                
+        except Exception as inst:
+              ros_node.ParseException(inst)
+        finally:
+            return ros_msg
 
     def search_not_finished_torrents(self, options):
         ## TODO: Return finished torrents?
