@@ -20,4 +20,4 @@ fi
 info "Triggering YTS crawler"
 rostopic pub /yts_finder/trigger_download torrent_search/TriggerDownload "header: auto
 seeds: $SEED_VALUE
-search_type: 3" -1;
+search_type: 102" -1;
