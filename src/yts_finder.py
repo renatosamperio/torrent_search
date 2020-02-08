@@ -390,7 +390,7 @@ class YtsFinder(ros_node.RosNode):
                             else:
                                 date_uploaded = msg.date_uploaded
                             options.update({'date_uploaded': date_uploaded})
-                            rospy.loginfo('Setting up only not downloaded torrents by date uploaded')
+                            rospy.loginfo('Setting up search for [%s]'%msg.date_uploaded)
     
                         ## Setting search query
                         msg = self.client.search_filtered(options)
