@@ -83,12 +83,13 @@ class YtsRecords(object):
                     ] }
 
                 sort_condition = [
-                    ("year", pymongo.DESCENDING),
                     ("rating", pymongo.DESCENDING), 
+                    ("year", pymongo.DESCENDING),
                     ("date_uploaded", pymongo.ASCENDING)
                 ]
             ## Execute query
             posts     = self.db_handler.Find(query, sort_condition=sort_condition)
+            #posts     = self.db_handler.collection.find(query).sort(sort_condition)
             
             ## Sorting out results
             if 'seeds' in configured_options:
