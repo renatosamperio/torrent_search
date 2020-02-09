@@ -74,10 +74,13 @@ class YtsRecords(object):
                 query = { '$and': [ {'torrents.seeds': { '$gte': options['seeds'] }},{ "torrents.state.status": { '$ne': "finished" }  } ] };
                 sort_condition = None
 
-            ## Search DB with given title
+            ## Search DB with given upload date torrents that were not downloaded
             elif 'date_uploaded' in configured_options:
                 rospy.loginfo('Search not download items DB with given seeds')
-                query = {'date_uploaded': { '$gte': options['date_uploaded'] }}
+                query = { '$and': [ 
+                        {'date_uploaded': {'$gte': options['date_uploaded']}},
+                        { "torrents.state.status": { '$ne': "finished" }  } 
+                    ] }
 
                 sort_condition = [
                     ("year", pymongo.DESCENDING),
