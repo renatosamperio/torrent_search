@@ -140,7 +140,8 @@ class YtsRequests(object):
             rospy.loginfo('Checking page [%d]'%payload['page'])
             ## Request initial status
             
-            coded_url = '?limit=%d&page=%d&with_rt_ratings=%s'%(payload['limit'], payload['page'],payload['with_rt_ratings'])
+            coded_url = '?limit=%d&page=%d&with_rt_ratings=%s'%(
+                payload['limit'], payload['page'],payload['with_rt_ratings'])
             response        = requests.get(url+coded_url) 
 #             pprint(response.request.__dict__)
 #             print "---> url:", (url+coded_url)
