@@ -3,7 +3,6 @@
 import sys, os
 import threading
 import rospy
-import datetime
 import time
 import json
 import Queue
@@ -14,9 +13,11 @@ from collections import defaultdict
 from optparse import OptionParser, OptionGroup
 from pprint import pprint
 from bs4 import BeautifulSoup
+from datetime import datetime
 
 from hs_utils import ros_node, logging_utils
 from hs_utils.mongo_handler import MongoAccess
+from std_msgs.msg import Bool
 
 class GalaxyCrawler:
     def __init__(self, **kwargs):
@@ -233,6 +234,7 @@ class GalaxyCrawler:
               ros_node.ParseException(inst)
             
     def search(self, url):
+        result = False
         try:
             ## let's access latest torrents at GalaxyTorrent
             rospy.logdebug('  Requesting website')
@@ -260,7 +262,8 @@ class GalaxyCrawler:
                 ## TODO: do not update elements that are the same?
                 ##       or update everything but 'imdb_updated'
                 ## adding imdb was collected
-                dict_row.update({'imdb_updated': False})
+                dict_row.update({'imdb_updated'   : False})
+                dict_row.update({'torrent_updated': datetime.now()})
                 
                 ## updating DB records with new item
                 condition = { 'galaxy_id' : dict_row['galaxy_id'] }
@@ -269,8 +272,13 @@ class GalaxyCrawler:
                 ## double check if something went wrong while updating DB
                 if not result:
                     rospy.logwarn('Invalid DB update for [%s]'%dict_row['galaxy_id'])
+                
+                ## setting state result
+                result = True
         except Exception as inst:
               ros_node.ParseException(inst)
+        finally:
+            return result
 
 class GalaxySearch(ros_node.RosNode):
     def __init__(self, **kwargs):
@@ -335,7 +343,8 @@ class GalaxySearch(ros_node.RosNode):
                 
                 rospy.loginfo('Getting latest torrents from GalaxyTorrent')
                 url= 'https://torrentgalaxy.to/torrents.php?cat=41'
-                self.crawler.search(url)
+                ok = self.crawler.search(url)
+                self.Publish('/galaxy_search/ready', Bool(ok) )
                 rate_sleep.sleep()
             
         except Exception as inst:
@@ -373,14 +382,10 @@ if __name__ == '__main__':
     rospy.init_node('galaxy_search', anonymous=False, log_level=logLevel)
     
     ## Defining static variables for subscribers and publishers
-    sub_topics     = [
-#         ('/event_locator/weekly_events',  WeeklyEvents),
-    ]
+    system_params  = []
+    sub_topics     = []
     pub_topics     = [
-#         ('/event_locator/updated_events', WeeklyEvents)
-    ]
-    system_params  = [
-        #'/event_locator_param'
+        ('/galaxy_search/ready',  Bool),
     ]
     
     ## Defining arguments
