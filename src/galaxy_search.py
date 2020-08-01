@@ -7,6 +7,7 @@ import time
 import json
 import Queue
 import requests
+import re
 import xmltodict, json
 
 from collections import defaultdict
@@ -15,6 +16,7 @@ from pprint import pprint
 from bs4 import BeautifulSoup
 from datetime import datetime
 
+from hs_utils import imdb_handler
 from hs_utils import ros_node, logging_utils
 from hs_utils.mongo_handler import MongoAccess
 from std_msgs.msg import Bool
@@ -22,12 +24,25 @@ from std_msgs.msg import Bool
 class GalaxyCrawler:
     def __init__(self, **kwargs):
         try:
+            self.imdb_handler = None
+            self.database     = None
+            self.collection   = None
+            self.db_handler   = None
+            self.parser       = None
+            self.list_terms   = None
+            self.imdb_handler = None
+            
             for key, value in kwargs.iteritems():
                 if "database" == key:
                     self.database = value
                 elif "collection" == key:
                     self.collection = value
+                elif "list_terms" == key:
+                    self.list_terms = value
                     
+            if not self.list_terms:
+                raise Exception("Missing list of terms")
+            
             ## Creating DB handler
             self.db_handler = MongoAccess()
             connected       = self.db_handler.Connect(
@@ -39,8 +54,17 @@ class GalaxyCrawler:
             else:
                 rospy.loginfo("- Created DB handler in %s.%s"%
                               (self.database, self.collection))
-                
-                
+            
+            ## creating imdb connection
+            args = {
+                'list_terms':self.list_terms,
+                'imdb':      True
+            }
+            
+            self.imdb_handler = imdb_handler.IMDbHandler(**args)
+            rospy.logdebug("Created IMDb handler")
+            
+            ## creating parser of HTML crawling rows
             self.parser = defaultdict(lambda:[]) 
             self.parser.update({
                 ## Type
@@ -232,7 +256,61 @@ class GalaxyCrawler:
             return result
         except Exception as inst:
               ros_node.ParseException(inst)
+
+    def get_torrent_info(self, torrent):
+        ## preparing regex for season, episode and date
+        episode_pattern = r"(?:s|season)(\d{2})(?:e|x|episode|\n)(\d{2})"
+        pattern_date    = r'(\d{4}[+\s]\d{2}[+\s]\d{2})'
+        compile_date    = re.compile(pattern_date)
+        
+        try:
+            ## preparing torrent id 
+            torrent_info = {}
+            galaxy_id = torrent['galaxy_id']
+            imdb_code = torrent['imdb_code']
             
+            ## getting extra information from torrent title
+            title     = torrent['title'].replace('.', ' ').strip()
+            mopped    = self.imdb_handler.clean_sentence(title).strip(' -')
+            rospy.logdebug('Looking for extra data in [%s]'%title)
+            
+            ## searching for season/episode
+            has_episode_info = re.search(episode_pattern, mopped, re.I) 
+            if has_episode_info:
+                start,end = has_episode_info.span() 
+                mopped    = mopped[:start]+ mopped[end:]
+                mopped    = mopped.strip()
+                season,episode = has_episode_info.groups()
+
+                ## adding episode and data 
+                torrent_info['season']  = season
+                torrent_info['episode'] = episode
+                rospy.logdebug('  Found season/episode [%s/%s] in [%s]'%
+                               (season, episode,galaxy_id))
+             
+            else:
+                ## searching for date information
+                matches      = list(compile_date.finditer(mopped))
+                has_date     = re.search(pattern_date, mopped, re.I)
+                if has_date:
+                    start,end   = has_date.span()
+                    mopped      = mopped[:start]+ mopped[end:]
+                    mopped      = mopped.strip()
+                    date_torrent= has_date.groups()[0]
+                    
+                    ## adding title and date
+                    torrent_info['date'] = date_torrent
+                    rospy.logdebug('  Found date  [%s] in [%s]'%
+                                   (date_torrent, galaxy_id))
+
+            ## Adding torrent information
+            torrent_info['title'] = mopped
+            torrent.update({'torrent_info':torrent_info})
+            rospy.logdebug('Updated item [%s]'%galaxy_id)
+ 
+        except Exception as inst:
+              ros_node.ParseException(inst)
+           
     def search(self, url):
         result = False
         try:
@@ -265,13 +343,15 @@ class GalaxyCrawler:
                 dict_row.update({'imdb_updated'   : False})
                 dict_row.update({'torrent_updated': datetime.now()})
                 
-                ## updating DB records with new item
-                condition = { 'galaxy_id' : dict_row['galaxy_id'] }
-                result = self.db_handler.Update(condition, dict_row, upsertValue=True)
+                ## looking for more information about the torrent
+                ## that is included in the torrent title
+                self.get_torrent_info( dict_row )
                 
-                ## double check if something went wrong while updating DB
-                if not result:
-                    rospy.logwarn('Invalid DB update for [%s]'%dict_row['galaxy_id'])
+                ## updating DB records with new item
+                galaxy_id = dict_row['galaxy_id']
+                condition = { 'galaxy_id' : galaxy_id }
+                ok = self.db_handler.Update(condition, dict_row, upsertValue=True)
+                if not ok: rospy.logwarn('Invalid DB update for [%s]'%galaxy_id)
                 
                 ## setting state result
                 result = True
@@ -280,10 +360,18 @@ class GalaxyCrawler:
         finally:
             return result
 
+    def close(self):
+        try:
+            self.db_handler.debug = 0
+            self.db_handler.Close()
+        except Exception as inst:
+            ros_node.ParseException(inst)
+
 class GalaxySearch(ros_node.RosNode):
     def __init__(self, **kwargs):
         try:
             
+            self.list_terms = None            
             self.condition  = threading.Condition()
             self.queue      = Queue.Queue()
             self.rate       = 5000
@@ -318,23 +406,33 @@ class GalaxySearch(ros_node.RosNode):
       
     def Init(self):
         try:
-            args = {
-                'database':     'galaxy',
-                'collection':   'torrents'
-            }            
-            self.crawler = GalaxyCrawler(**args)
             
-            rospy.Timer(rospy.Duration(0.5), self.Run, oneshot=True)
+            ## getting parameters
+            self.list_terms = self.mapped_params['/galaxy_imdb/list_term'].param_value
+            
+            kwargs = {
+                'database':     'galaxy',
+                'collection':   'torrents',
+                'list_terms':   self.list_terms
+            }
+            self.crawler = GalaxyCrawler(**kwargs)
+            
+            rospy.Timer(rospy.Duration(0.5), self.CollectOne,     oneshot=True)
+            #rospy.Timer(rospy.Duration(0.5), self.CollectHistory, oneshot=True)
         except Exception as inst:
               ros_node.ParseException(inst)
               
     def ShutdownCallback(self):
         try:
-            rospy.logdebug('+ Shutdown: Doing nothing...')
+            rospy.logdebug('+ Shutdown: Closing torrent parser')
+            if self.crawler:
+                self.crawler.close()
+                self.crawler = None
+                
         except Exception as inst:
               ros_node.ParseException(inst)
-              
-    def Run(self, event):
+
+    def CollectOne(self, event):
         ''' Run method '''
         try:
             rospy.logdebug('+ Starting run method')
@@ -350,6 +448,21 @@ class GalaxySearch(ros_node.RosNode):
         except Exception as inst:
               ros_node.ParseException(inst)
 
+    def CollectHistory(self, event):
+        ''' Run method '''
+        try:
+            ## Collect the next 10 pages and update IMDB code
+            url= 'https://torrentgalaxy.to/torrents.php?cat=41&parent_cat=&sort=id&order=desc&page='
+            search_pages = 10
+            for page in range(1, search_pages):
+                search_url = url+str(page)
+                rospy.logdebug('Getting history in GalaxyTorrent page [%d]'%page)
+                #ok = self.crawler.search(url)
+            
+        except Exception as inst:
+              ros_node.ParseException(inst)
+              
+            
 if __name__ == '__main__':
     usage       = "usage: %prog option1=string option2=bool"
     parser      = OptionParser(usage=usage)
@@ -382,10 +495,12 @@ if __name__ == '__main__':
     rospy.init_node('galaxy_search', anonymous=False, log_level=logLevel)
     
     ## Defining static variables for subscribers and publishers
-    system_params  = []
     sub_topics     = []
     pub_topics     = [
         ('/galaxy_search/ready',  Bool),
+    ]
+    system_params  = [
+        '/galaxy_imdb/list_term',
     ]
     
     ## Defining arguments
@@ -395,7 +510,7 @@ if __name__ == '__main__':
     args.update({'pub_topics':      pub_topics})
     args.update({'allow_std_out':   options.std_out})
     args.update({'rate':            options.rate})
-    #args.update({'system_params':   system_params})
+    args.update({'system_params':   system_params})
     
     # Go to class functions that do all the heavy lifting.
     try:
