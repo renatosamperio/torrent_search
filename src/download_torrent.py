@@ -1684,14 +1684,14 @@ if __name__ == '__main__':
                 action='store_true',
                 default=False,
                 help='Message latching')
-    parser.add_option('--debug',
+    parser.add_option('--debug','-d',
                 action='store_true',
                 default=False,
-                help='Provide debug level')
-    parser.add_option('--syslog',
-                action='store_true',
-                default=False,
-                help='Start with syslog logger')
+                help='Input debug level')
+    parser.add_option('--std_out', '-o',
+                action='store_false',
+                default=True,
+                help='Allowing standard output')
 
     setup_opts = OptionGroup(parser, "Downloading options")
     setup_opts.add_option('--save_path',
@@ -1717,16 +1717,12 @@ if __name__ == '__main__':
     logLevel        = rospy.DEBUG if options.debug else rospy.INFO
     rospy.init_node('download_torrent', anonymous=False, log_level=logLevel)
     
-    ## Sending logging to syslog
-    if options.syslog:
-        logging_utils.update_loggers()
-
     ## Defining static variables for subscribers and publishers
     sub_topics     = [
-        ('~move_state',                 State),
-        ('~start',                      State),
-        ('~set_download_pause',         Float64),
-        ('~set_download_time',          Float64),
+        ('/download_torrent/move_state',                 State),
+        ('/download_torrent/start',                      State),
+        ('/download_torrent/set_download_pause',         Float64),
+        ('/download_torrent/set_download_time',          Float64),
         ('/yts_finder/found_torrents',  YtsTorrents)
     ]
     pub_topics     = [
@@ -1749,6 +1745,7 @@ if __name__ == '__main__':
     args.update({'sub_topics':      sub_topics})
     args.update({'pub_topics':      pub_topics})
     args.update({'system_params':   system_params})
+    args.update({'allow_std_out': options.std_out})
     
     # Go to class functions that do all the heavy lifting.
     try:

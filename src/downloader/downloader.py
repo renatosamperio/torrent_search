@@ -235,11 +235,11 @@ if __name__ == '__main__':
     parser.add_option('--debug', '-d',
                 action='store_true',
                 default=True,
-                help='Provide debug level')
-    parser.add_option('--syslog',
-                action='store_true',
-                default=False,
-                help='Start with syslog logger')
+                help='Input debug level')
+    parser.add_option('--std_out', '-o',
+                action='store_false',
+                default=True,
+                help='Allowing standard output')
 
     (options, args) = parser.parse_args()
 
@@ -247,26 +247,19 @@ if __name__ == '__main__':
     logLevel        = rospy.DEBUG if options.debug else rospy.INFO
     rospy.init_node('downloader', anonymous=False, log_level=logLevel)
     
-    ## Sending logging to syslog
-    if options.syslog:
-        logging_utils.update_loggers()
-
     ## Defining static variables for subscribers and publishers
     sub_topics     = [
          ('/yts_finder/torrents_to_download', SelectedTorrent)
     ]
-    pub_topics     = [
-#         ('/event_locator/updated_events', WeeklyEvents)
-    ]
-    system_params  = [
-        #'/event_locator_param'
-    ]
+    pub_topics     = []
+    system_params  = []
     
     ## Defining arguments
     args.update({'queue_size':      options.queue_size})
     args.update({'latch':           options.latch})
     args.update({'sub_topics':      sub_topics})
     args.update({'pub_topics':      pub_topics})
+    args.update({'allow_std_out':   options.std_out})
     #args.update({'system_params':   system_params})
     
     # Go to class functions that do all the heavy lifting.
